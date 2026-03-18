@@ -411,3 +411,59 @@ async function addMoneyToGoal(goalId) {
     alert(error.message);
   }
 }
+
+async function setupProfilePage() {
+  const user = redirectToLoginIfNeeded();
+  if (!user) return;
+
+  setupLogoutButtons();
+
+  const avatar = document.getElementById("profileAvatar");
+  const nameText = document.getElementById("profileNameText");
+  const emailText = document.getElementById("profileEmailText");
+  const nameInput = document.getElementById("profileNameInput");
+  const emailInput = document.getElementById("profileEmailInput");
+  const userIdText = document.getElementById("profileUserId");
+  const tokenText = document.getElementById("profileToken");
+  const profileMessage = document.getElementById("profileMessage");
+  const profileForm = document.getElementById("profileForm");
+
+  try {
+    const profile = await apiRequest(`${AUTH_API}/users/${user.user_id}`);
+
+    if (avatar) avatar.textContent = profile.name[0].toUpperCase();
+    if (nameText) nameText.textContent = profile.name;
+    if (emailText) emailText.textContent = profile.email;
+    if (nameInput) nameInput.value = profile.name;
+    if (emailInput) emailInput.value = profile.email;
+    if (userIdText) userIdText.textContent = user.user_id;
+    if (tokenText) tokenText.textContent = user.access_token || "-";
+  } catch (error) {
+    profileMessage.textContent = error.message;
+  }
+
+  profileForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const newName = nameInput.value.trim();
+
+    try {
+      const updated = await apiRequest(`${AUTH_API}/users/${user.user_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: newName }),
+      });
+
+      setCurrentUser({
+        ...user,
+        name: updated.name,
+      });
+
+      if (avatar) avatar.textContent = updated.name[0].toUpperCase();
+      if (nameText) nameText.textContent = updated.name;
+
+      profileMessage.textContent = "Profile updated successfully";
+    } catch (error) {
+      profileMessage.textContent = error.message;
+    }
+  });
+}

@@ -33,6 +33,8 @@ class UserResponse(BaseModel):
     email: EmailStr
     name: str
 
+class UserUpdateRequest(BaseModel):
+    name: str
 
 @app.get("/")
 def root():
@@ -74,11 +76,27 @@ def login(data: LoginRequest):
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 
+
 @app.get("/users/{user_id}", response_model=UserResponse)
 def get_user(user_id: str):
     user = users_db.get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user["name"],
+    }
+
+
+@app.patch("/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: str, data: UserUpdateRequest):
+    user = users_db.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user["name"] = data.name
 
     return {
         "id": user["id"],

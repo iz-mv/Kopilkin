@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kopilkin - Profile</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app-bg">
+  <div class="mobile-shell">
+    <header class="topbar">
+      <div>
+        <div class="small-label">Your account</div>
+        <h1 class="page-title">Profile</h1>
+      </div>
+      <div class="avatar-circle" id="profileAvatar">U</div>
+    </header>
+
+    <section class="card profile-card">
+      <div class="profile-avatar-large">🐷</div>
+      <h2 class="profile-name" id="profileNameText">User</h2>
+      <p class="muted-text profile-email" id="profileEmailText">email@example.com</p>
+      <div class="profile-badge">Auth method: Email / Password</div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">Edit profile</h2>
+      <form id="profileForm" class="form-block">
+        <input type="text" id="profileNameInput" placeholder="Your name" required />
+        <input type="email" id="profileEmailInput" disabled />
+        <button type="submit" class="primary-btn">Save changes</button>
+      </form>
+      <p id="profileMessage" class="message-text"></p>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">Account info</h2>
+      <div class="info-row">
+        <span class="info-label">User ID</span>
+        <span class="info-value" id="profileUserId">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Access token</span>
+        <span class="info-value token-preview" id="profileToken">-</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <button id="logoutBtn" class="dark-btn full-btn">Logout</button>
+    </section>
+
+    <nav class="bottom-nav">
+      <a href="home.html" class="nav-item">Home</a>
+      <a href="goals.html" class="nav-item">Goals</a>
+      <a href="profile.html" class="nav-item active-nav">Profile</a>
+    </nav>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    setupProfilePage();
+  </script>
+</body>
+</html>
