@@ -2,6 +2,30 @@ const AUTH_API = "http://127.0.0.1:8001";
 const TRANSACTION_API = "http://127.0.0.1:8002";
 const SAVINGS_API = "http://127.0.0.1:8003";
 
+const EXPENSE_CATEGORIES = [
+  "Restaurants",
+  "Transport",
+  "Groceries",
+  "Shopping",
+  "Health",
+  "Entertainment",
+  "Bills",
+  "Travel",
+  "Education",
+  "Other"
+];
+
+const INCOME_CATEGORIES = [
+  "Salary",
+  "Bonus",
+  "Cashback",
+  "Gift",
+  "Support",
+  "Freelance",
+  "Refund",
+  "Other"
+];
+
 function setCurrentUser(user) {
   localStorage.setItem("kopilkin_user", JSON.stringify(user));
 }
@@ -145,7 +169,8 @@ function setupHomePage() {
   }
 
   setupLogoutButtons();
-  setupCategoryChips();
+  setupTypeChips();
+  renderCategoryChips("expense");
   setTodayDate();
   loadTransactionsAndSummary(user.user_id);
 
@@ -153,42 +178,50 @@ function setupHomePage() {
   const refreshBtn = document.getElementById("refreshTransactionsBtn");
   const transactionMessage = document.getElementById("transactionMessage");
 
-  transactionForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  if (transactionForm) {
+    transactionForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-    const amount = parseFloat(document.getElementById("txAmount").value);
-    const date = document.getElementById("txDate").value;
-    const type = document.getElementById("txType").value;
-    const description = document.getElementById("txDescription").value.trim();
-    const activeChip = document.querySelector(".chip.active-chip");
-    const category = activeChip ? activeChip.dataset.category : "Other";
+      const rawAmount = parseFloat(document.getElementById("txAmount").value);
+      const amount = Math.abs(rawAmount);
+      const date = document.getElementById("txDate").value;
+      const description = document.getElementById("txDescription").value.trim();
 
-    try {
-      await apiRequest(`${TRANSACTION_API}/transactions`, {
-        method: "POST",
-        body: JSON.stringify({
-          user_id: user.user_id,
-          amount,
-          category,
-          date,
-          type,
-          description: description || null,
-        }),
-      });
+      const activeTypeChip = document.querySelector(".type-chip.active-type-chip");
+      const type = activeTypeChip ? activeTypeChip.dataset.type : "expense";
 
-      transactionMessage.textContent = "Transaction saved successfully";
-      transactionForm.reset();
-      setTodayDate();
-      resetActiveChip();
+      const activeCategoryChip = document.querySelector("#categoryChips .chip.active-chip");
+      const category = activeCategoryChip ? activeCategoryChip.dataset.category : "Other";
+
+      try {
+        await apiRequest(`${TRANSACTION_API}/transactions`, {
+          method: "POST",
+          body: JSON.stringify({
+            user_id: user.user_id,
+            amount,
+            category,
+            date,
+            type,
+            description: description || null,
+          }),
+        });
+
+        transactionMessage.textContent = "Transaction saved successfully";
+        transactionForm.reset();
+        setTodayDate();
+        renderCategoryChips(type);
+        loadTransactionsAndSummary(user.user_id);
+      } catch (error) {
+        transactionMessage.textContent = error.message;
+      }
+    });
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
       loadTransactionsAndSummary(user.user_id);
-    } catch (error) {
-      transactionMessage.textContent = error.message;
-    }
-  });
-
-  refreshBtn.addEventListener("click", () => {
-    loadTransactionsAndSummary(user.user_id);
-  });
+    });
+  }
 }
 
 function setupGoalsPage() {
@@ -207,33 +240,95 @@ function setupGoalsPage() {
   const refreshBtn = document.getElementById("refreshGoalsBtn");
   const goalMessage = document.getElementById("goalMessage");
 
-  goalForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  if (goalForm) {
+    goalForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-    const title = document.getElementById("goalTitle").value.trim();
-    const target_amount = parseFloat(document.getElementById("goalTargetAmount").value);
+      const title = document.getElementById("goalTitle").value.trim();
+      const target_amount = Math.abs(parseFloat(document.getElementById("goalTargetAmount").value));
 
-    try {
-      await apiRequest(`${SAVINGS_API}/goals`, {
-        method: "POST",
-        body: JSON.stringify({
-          user_id: user.user_id,
-          title,
-          target_amount,
-        }),
-      });
+      try {
+        await apiRequest(`${SAVINGS_API}/goals`, {
+          method: "POST",
+          body: JSON.stringify({
+            user_id: user.user_id,
+            title,
+            target_amount,
+          }),
+        });
 
-      goalMessage.textContent = "Goal created successfully";
-      goalForm.reset();
+        goalMessage.textContent = "Goal created successfully";
+        goalForm.reset();
+        loadGoals(user.user_id);
+      } catch (error) {
+        goalMessage.textContent = error.message;
+      }
+    });
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
       loadGoals(user.user_id);
-    } catch (error) {
-      goalMessage.textContent = error.message;
-    }
-  });
+    });
+  }
+}
 
-  refreshBtn.addEventListener("click", () => {
-    loadGoals(user.user_id);
-  });
+function setupProfilePage() {
+  const user = redirectToLoginIfNeeded();
+  if (!user) return;
+
+  setupLogoutButtons();
+
+  const avatar = document.getElementById("profileAvatar");
+  const nameText = document.getElementById("profileNameText");
+  const emailText = document.getElementById("profileEmailText");
+  const nameInput = document.getElementById("profileNameInput");
+  const emailInput = document.getElementById("profileEmailInput");
+  const userIdText = document.getElementById("profileUserId");
+  const tokenText = document.getElementById("profileToken");
+  const profileMessage = document.getElementById("profileMessage");
+  const profileForm = document.getElementById("profileForm");
+
+  apiRequest(`${AUTH_API}/users/${user.user_id}`)
+    .then((profile) => {
+      if (avatar) avatar.textContent = profile.name[0].toUpperCase();
+      if (nameText) nameText.textContent = profile.name;
+      if (emailText) emailText.textContent = profile.email;
+      if (nameInput) nameInput.value = profile.name;
+      if (emailInput) emailInput.value = profile.email;
+      if (userIdText) userIdText.textContent = user.user_id;
+      if (tokenText) tokenText.textContent = user.access_token || "-";
+    })
+    .catch((error) => {
+      if (profileMessage) profileMessage.textContent = error.message;
+    });
+
+  if (profileForm) {
+    profileForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const newName = nameInput.value.trim();
+
+      try {
+        const updated = await apiRequest(`${AUTH_API}/users/${user.user_id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ name: newName }),
+        });
+
+        setCurrentUser({
+          ...user,
+          name: updated.name,
+        });
+
+        if (avatar) avatar.textContent = updated.name[0].toUpperCase();
+        if (nameText) nameText.textContent = updated.name;
+
+        profileMessage.textContent = "Profile updated successfully";
+      } catch (error) {
+        profileMessage.textContent = error.message;
+      }
+    });
+  }
 }
 
 function setupLogoutButtons() {
@@ -246,19 +341,40 @@ function setupLogoutButtons() {
   });
 }
 
-function setupCategoryChips() {
-  document.querySelectorAll(".chip").forEach((chip) => {
+function setupTypeChips() {
+  document.querySelectorAll(".type-chip").forEach((chip) => {
     chip.addEventListener("click", () => {
-      document.querySelectorAll(".chip").forEach((c) => c.classList.remove("active-chip"));
-      chip.classList.add("active-chip");
+      document.querySelectorAll(".type-chip").forEach((c) => c.classList.remove("active-type-chip"));
+      chip.classList.add("active-type-chip");
+      renderCategoryChips(chip.dataset.type);
     });
   });
 }
 
-function resetActiveChip() {
-  const chips = document.querySelectorAll(".chip");
-  chips.forEach((chip) => chip.classList.remove("active-chip"));
-  if (chips[0]) chips[0].classList.add("active-chip");
+function renderCategoryChips(type) {
+  const container = document.getElementById("categoryChips");
+  if (!container) return;
+
+  const categories = type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
+  container.innerHTML = categories
+    .map((category, index) => `
+      <button
+        type="button"
+        class="chip ${index === 0 ? "active-chip" : ""}"
+        data-category="${category}"
+      >
+        ${category}
+      </button>
+    `)
+    .join("");
+
+  container.querySelectorAll(".chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      container.querySelectorAll(".chip").forEach((c) => c.classList.remove("active-chip"));
+      chip.classList.add("active-chip");
+    });
+  });
 }
 
 function setTodayDate() {
@@ -278,13 +394,17 @@ async function loadTransactionsAndSummary(userId) {
 
     renderTransactions(transactions);
 
-    document.getElementById("todaySpent").textContent = formatMoney(
-      calculateTodaySpent(transactions)
-    );
+    const todaySpent = calculateTodaySpent(transactions);
+    const todayIncome = calculateTodayIncome(transactions);
+
+    document.getElementById("todaySpent").textContent = formatMoney(todaySpent);
     document.getElementById("totalIncome").textContent = formatMoney(summary.total_income || 0);
-    document.getElementById("suggestedSave").textContent = formatMoney(
-      Math.round((calculateTodaySpent(transactions) || 0) * 0.1)
-    );
+
+    const suggested = todayIncome > 0
+      ? Math.round(todayIncome * 0.1)
+      : Math.round(todaySpent * 0.1);
+
+    document.getElementById("suggestedSave").textContent = formatMoney(suggested);
   } catch (error) {
     document.getElementById("transactionsList").innerHTML =
       `<p class="muted-text">${error.message}</p>`;
@@ -298,6 +418,13 @@ function calculateTodaySpent(transactions) {
     .reduce((sum, t) => sum + t.amount, 0);
 }
 
+function calculateTodayIncome(transactions) {
+  const today = new Date().toISOString().split("T")[0];
+  return transactions
+    .filter((t) => t.date === today && t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
 function renderTransactions(transactions) {
   const container = document.getElementById("transactionsList");
   if (!container) return;
@@ -308,17 +435,19 @@ function renderTransactions(transactions) {
   }
 
   const grouped = {};
-  transactions
-    .slice()
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .forEach((tx) => {
-      if (!grouped[tx.date]) grouped[tx.date] = [];
-      grouped[tx.date].push(tx);
-    });
+  transactions.forEach((tx) => {
+    if (!grouped[tx.date]) grouped[tx.date] = [];
+    grouped[tx.date].push(tx);
+  });
 
   container.innerHTML = Object.entries(grouped)
+    .sort((a, b) => new Date(b[0]) - new Date(a[0]))
     .map(([date, items]) => {
-      const dailyTotal = items
+      const sortedItems = items
+        .slice()
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      const dailyTotal = sortedItems
         .filter((i) => i.type === "expense")
         .reduce((sum, i) => sum + i.amount, 0);
 
@@ -328,7 +457,7 @@ function renderTransactions(transactions) {
             <div class="transaction-day-title">${formatDate(date)}</div>
             <div class="small-label">Spent: ${formatMoney(dailyTotal)}</div>
           </div>
-          ${items
+          ${sortedItems
             .map(
               (tx) => `
               <div class="transaction-item">
@@ -336,8 +465,11 @@ function renderTransactions(transactions) {
                   <div class="transaction-category">${tx.category}</div>
                   <div class="transaction-note">${tx.description || tx.type}</div>
                 </div>
-                <div class="transaction-amount ${tx.type}">
-                  ${tx.type === "expense" ? "-" : "+"}${formatMoney(tx.amount)}
+                <div class="transaction-right">
+                  <div class="transaction-amount ${tx.type}">
+                    ${tx.type === "expense" ? "-" : "+"}${formatMoney(tx.amount)}
+                  </div>
+                  <button class="delete-btn" onclick="deleteTransaction('${tx.id}')">Delete</button>
                 </div>
               </div>
             `
@@ -347,6 +479,21 @@ function renderTransactions(transactions) {
       `;
     })
     .join("");
+}
+
+async function deleteTransaction(transactionId) {
+  const user = getCurrentUser();
+  if (!user) return;
+
+  try {
+    await apiRequest(`${TRANSACTION_API}/transactions/${transactionId}`, {
+      method: "DELETE",
+    });
+
+    loadTransactionsAndSummary(user.user_id);
+  } catch (error) {
+    alert(error.message);
+  }
 }
 
 async function loadGoals(userId) {
@@ -384,7 +531,7 @@ function renderGoals(goals) {
             <span>${goal.progress_percent}% completed</span>
           </div>
           <div class="goal-actions">
-            <input type="number" step="0.01" placeholder="Add amount" id="goal-input-${goal.id}" />
+            <input type="number" step="0.01" min="0.01" placeholder="Add amount" id="goal-input-${goal.id}" />
             <button class="primary-btn" onclick="addMoneyToGoal('${goal.id}')">Add</button>
           </div>
         </div>
@@ -398,72 +545,16 @@ async function addMoneyToGoal(goalId) {
   const user = getCurrentUser();
   const amount = parseFloat(input.value);
 
-  if (!amount || amount <= 0) return;
+  if (!amount || amount === 0) return;
 
   try {
     await apiRequest(`${SAVINGS_API}/goals/${goalId}/add`, {
       method: "PATCH",
-      body: JSON.stringify({ amount_to_add: amount }),
+      body: JSON.stringify({ amount_change: amount }),
     });
 
     loadGoals(user.user_id);
   } catch (error) {
     alert(error.message);
   }
-}
-
-async function setupProfilePage() {
-  const user = redirectToLoginIfNeeded();
-  if (!user) return;
-
-  setupLogoutButtons();
-
-  const avatar = document.getElementById("profileAvatar");
-  const nameText = document.getElementById("profileNameText");
-  const emailText = document.getElementById("profileEmailText");
-  const nameInput = document.getElementById("profileNameInput");
-  const emailInput = document.getElementById("profileEmailInput");
-  const userIdText = document.getElementById("profileUserId");
-  const tokenText = document.getElementById("profileToken");
-  const profileMessage = document.getElementById("profileMessage");
-  const profileForm = document.getElementById("profileForm");
-
-  try {
-    const profile = await apiRequest(`${AUTH_API}/users/${user.user_id}`);
-
-    if (avatar) avatar.textContent = profile.name[0].toUpperCase();
-    if (nameText) nameText.textContent = profile.name;
-    if (emailText) emailText.textContent = profile.email;
-    if (nameInput) nameInput.value = profile.name;
-    if (emailInput) emailInput.value = profile.email;
-    if (userIdText) userIdText.textContent = user.user_id;
-    if (tokenText) tokenText.textContent = user.access_token || "-";
-  } catch (error) {
-    profileMessage.textContent = error.message;
-  }
-
-  profileForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const newName = nameInput.value.trim();
-
-    try {
-      const updated = await apiRequest(`${AUTH_API}/users/${user.user_id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ name: newName }),
-      });
-
-      setCurrentUser({
-        ...user,
-        name: updated.name,
-      });
-
-      if (avatar) avatar.textContent = updated.name[0].toUpperCase();
-      if (nameText) nameText.textContent = updated.name;
-
-      profileMessage.textContent = "Profile updated successfully";
-    } catch (error) {
-      profileMessage.textContent = error.message;
-    }
-  });
 }

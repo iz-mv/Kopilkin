@@ -479,3 +479,43 @@ select {
 .full-btn {
   width: 100%;
 }
+
+.type-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.type-chip {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 14px;
+  background: #eef3f8;
+  color: #374151;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.active-type-chip {
+  background: #111827;
+  color: white;
+}
+
+.delete-btn {
+  border: none;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.transaction-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}

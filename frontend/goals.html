@@ -20,7 +20,7 @@
       <h2 class="section-title">Create new goal</h2>
       <form id="goalForm" class="form-block">
         <input type="text" id="goalTitle" placeholder="Goal title" required />
-        <input type="number" step="0.01" id="goalTargetAmount" placeholder="Target amount" required />
+        <input type="number" step="0.01" placeholder="Use + or - amount" id="goal-input-${goal.id}" />
         <button type="submit" class="primary-btn">Add new goal</button>
       </form>
       <p id="goalMessage" class="message-text"></p>

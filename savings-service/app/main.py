@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List
-from fastapi.middleware.cors import CORSMiddleware
 import uuid
 
 app = FastAPI(title="Kopilkin Savings Service")
@@ -24,7 +24,7 @@ class GoalCreate(BaseModel):
 
 
 class GoalUpdate(BaseModel):
-    amount_to_add: float
+    amount_change: float
 
 
 class GoalResponse(BaseModel):
@@ -43,6 +43,9 @@ def root():
 
 @app.post("/goals", response_model=GoalResponse)
 def create_goal(data: GoalCreate):
+    if data.target_amount <= 0:
+        raise HTTPException(status_code=400, detail="Target amount must be greater than 0")
+
     goal_id = str(uuid.uuid4())
     goal = {
         "id": goal_id,
@@ -78,12 +81,20 @@ def get_user_goals(user_id: str):
 
 
 @app.patch("/goals/{goal_id}/add", response_model=GoalResponse)
-def add_money_to_goal(goal_id: str, data: GoalUpdate):
+def update_goal_amount(goal_id: str, data: GoalUpdate):
     goal = goals_db.get(goal_id)
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    goal["current_amount"] += data.amount_to_add
+    if data.amount_change == 0:
+        raise HTTPException(status_code=400, detail="Amount change cannot be 0")
+
+    new_amount = goal["current_amount"] + data.amount_change
+
+    if new_amount < 0:
+        raise HTTPException(status_code=400, detail="Current amount cannot go below 0")
+
+    goal["current_amount"] = new_amount
 
     progress = 0.0
     if goal["target_amount"] > 0:

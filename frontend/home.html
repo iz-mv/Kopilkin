@@ -33,25 +33,27 @@
 
     <section class="card quick-add-card">
       <div class="section-row">
-        <h2 class="section-title">Quick add expense</h2>
+        <h2 class="section-title">Quick add transaction</h2>
       </div>
 
       <form id="transactionForm" class="form-block compact-form">
-        <input type="number" step="0.01" id="txAmount" placeholder="Amount" required />
+        <input
+          type="number"
+          step="0.01"
+          min="0.01"
+          id="txAmount"
+          placeholder="Amount"
+          required
+        />
 
-        <div class="chip-group">
-          <button type="button" class="chip active-chip" data-category="Restaurants">Restaurants</button>
-          <button type="button" class="chip" data-category="Transport">Transport</button>
-          <button type="button" class="chip" data-category="Shopping">Shopping</button>
-          <button type="button" class="chip" data-category="Groceries">Groceries</button>
-          <button type="button" class="chip" data-category="Other">Other</button>
+        <div class="type-toggle">
+          <button type="button" class="type-chip active-type-chip" data-type="expense">Expense</button>
+          <button type="button" class="type-chip" data-type="income">Income</button>
         </div>
 
+        <div class="chip-group" id="categoryChips"></div>
+
         <input type="date" id="txDate" required />
-        <select id="txType">
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-        </select>
         <input type="text" id="txDescription" placeholder="Note (optional)" />
 
         <button type="submit" class="primary-btn">Save transaction</button>
