@@ -1,9 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, EmailStr
 from typing import Dict
+from fastapi.middleware.cors import CORSMiddleware
 import uuid
 
 app = FastAPI(title="Kopilkin Auth Service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 users_db: Dict[str, dict] = {}
 

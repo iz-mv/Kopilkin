@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kopilkin - Login</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app-bg">
+  <div class="mobile-shell auth-shell">
+    <div class="auth-logo-wrap">
+      <img src="assets/kopilkin-logo.png" alt="Kopilkin Logo" class="brand-logo" />
+      <h1 class="brand-title">Kopilkin</h1>
+      <p class="brand-subtitle">Track expenses and grow your savings</p>
+    </div>
+
+    <div class="card auth-card">
+      <div class="auth-actions">
+        <button id="showLoginBtn" class="primary-btn">Login</button>
+        <button id="showRegisterBtn" class="secondary-btn">Register</button>
+        <button id="googleLoginBtn" class="google-btn">
+          <span class="google-icon">G</span>
+          <span>Continue with Google</span>
+        </button>
+      </div>
+
+      <form id="loginForm" class="form-block hidden-form">
+        <h2 class="section-title">Login</h2>
+        <p class="muted-text">Enter your email and password</p>
+        <input type="email" id="loginEmail" placeholder="Email" required />
+        <input type="password" id="loginPassword" placeholder="Password" required />
+        <button type="submit" class="dark-btn">Login</button>
+      </form>
+
+      <form id="registerForm" class="form-block hidden-form">
+        <h2 class="section-title">Create account</h2>
+        <p class="muted-text">Fill in your information to sign up</p>
+        <input type="text" id="registerName" placeholder="Your name" required />
+        <input type="email" id="registerEmail" placeholder="Email" required />
+        <input type="password" id="registerPassword" placeholder="Password" required />
+        <button type="submit" class="primary-btn">Register</button>
+      </form>
+
+      <p id="authMessage" class="message-text"></p>
+    </div>
+
+    <div class="pig-footer">
+      <span>🐷</span>
+      <span>🐽</span>
+      <span>💸</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    setupAuthPage();
+  </script>
+</body>
+</html>

@@ -1,9 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List
+from fastapi.middleware.cors import CORSMiddleware
 import uuid
 
 app = FastAPI(title="Kopilkin Savings Service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 goals_db: Dict[str, dict] = {}
 
