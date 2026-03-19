@@ -43,6 +43,7 @@ function redirectToLoginIfNeeded() {
   const user = getCurrentUser();
   if (!user) {
     window.location.href = "login.html";
+    return null;
   }
   return user;
 }
@@ -93,13 +94,13 @@ function setupAuthPage() {
     registerForm.classList.remove("show-form");
   }
 
-  showLoginBtn.addEventListener("click", () => {
+  showLoginBtn?.addEventListener("click", () => {
     hideForms();
     loginForm.classList.add("show-form");
     authMessage.textContent = "";
   });
 
-  showRegisterBtn.addEventListener("click", () => {
+  showRegisterBtn?.addEventListener("click", () => {
     hideForms();
     registerForm.classList.add("show-form");
     authMessage.textContent = "";
@@ -149,7 +150,7 @@ function setupAuthPage() {
     }
   });
 
-  googleLoginBtn.addEventListener("click", async () => {
+  googleLoginBtn?.addEventListener("click", async () => {
     try {
       const result = await apiRequest(`${AUTH_API}/google/login`);
       authMessage.textContent = result.message || "Google login placeholder";
@@ -187,6 +188,11 @@ function setupHomePage() {
       const date = document.getElementById("txDate").value;
       const description = document.getElementById("txDescription").value.trim();
 
+      if (!amount || amount <= 0) {
+        transactionMessage.textContent = "Amount must be greater than 0";
+        return;
+      }
+
       const activeTypeChip = document.querySelector(".type-chip.active-type-chip");
       const type = activeTypeChip ? activeTypeChip.dataset.type : "expense";
 
@@ -217,11 +223,9 @@ function setupHomePage() {
     });
   }
 
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", () => {
-      loadTransactionsAndSummary(user.user_id);
-    });
-  }
+  refreshBtn?.addEventListener("click", () => {
+    loadTransactionsAndSummary(user.user_id);
+  });
 }
 
 function setupGoalsPage() {
@@ -245,7 +249,17 @@ function setupGoalsPage() {
       e.preventDefault();
 
       const title = document.getElementById("goalTitle").value.trim();
-      const target_amount = Math.abs(parseFloat(document.getElementById("goalTargetAmount").value));
+      const rawTarget = parseFloat(document.getElementById("goalTargetAmount").value);
+
+      if (!title) {
+        goalMessage.textContent = "Goal title is required";
+        return;
+      }
+
+      if (!rawTarget || rawTarget <= 0) {
+        goalMessage.textContent = "Target amount must be greater than 0";
+        return;
+      }
 
       try {
         await apiRequest(`${SAVINGS_API}/goals`, {
@@ -253,7 +267,7 @@ function setupGoalsPage() {
           body: JSON.stringify({
             user_id: user.user_id,
             title,
-            target_amount,
+            target_amount: rawTarget,
           }),
         });
 
@@ -266,11 +280,9 @@ function setupGoalsPage() {
     });
   }
 
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", () => {
-      loadGoals(user.user_id);
-    });
-  }
+  refreshBtn?.addEventListener("click", () => {
+    loadGoals(user.user_id);
+  });
 }
 
 function setupProfilePage() {
@@ -406,8 +418,10 @@ async function loadTransactionsAndSummary(userId) {
 
     document.getElementById("suggestedSave").textContent = formatMoney(suggested);
   } catch (error) {
-    document.getElementById("transactionsList").innerHTML =
-      `<p class="muted-text">${error.message}</p>`;
+    const container = document.getElementById("transactionsList");
+    if (container) {
+      container.innerHTML = `<p class="muted-text">${error.message}</p>`;
+    }
   }
 }
 
@@ -445,7 +459,7 @@ function renderTransactions(transactions) {
     .map(([date, items]) => {
       const sortedItems = items
         .slice()
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
       const dailyTotal = sortedItems
         .filter((i) => i.type === "expense")
@@ -501,8 +515,10 @@ async function loadGoals(userId) {
     const goals = await apiRequest(`${SAVINGS_API}/goals/${userId}`);
     renderGoals(goals);
   } catch (error) {
-    document.getElementById("goalsList").innerHTML =
-      `<p class="muted-text">${error.message}</p>`;
+    const container = document.getElementById("goalsList");
+    if (container) {
+      container.innerHTML = `<p class="muted-text">${error.message}</p>`;
+    }
   }
 }
 
@@ -531,8 +547,8 @@ function renderGoals(goals) {
             <span>${goal.progress_percent}% completed</span>
           </div>
           <div class="goal-actions">
-            <input type="number" step="0.01" min="0.01" placeholder="Add amount" id="goal-input-${goal.id}" />
-            <button class="primary-btn" onclick="addMoneyToGoal('${goal.id}')">Add</button>
+            <input type="number" step="0.01" placeholder="Use + or - amount" id="goal-input-${goal.id}" />
+            <button class="primary-btn" onclick="addMoneyToGoal('${goal.id}')">Apply</button>
           </div>
         </div>
       `
