@@ -46,7 +46,7 @@ User financial data:
     response = httpx.post(
         f"{ollama_url}/api/chat",
         json=payload,
-        timeout=60.0
+        timeout=300.0
     )
 
     return response.json()["message"]["content"]

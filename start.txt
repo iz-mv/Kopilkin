@@ -7,3 +7,11 @@ python -m http.server 5500
 
 uvicorn app.main:app --reload --port 8004 - ai
 
+
+
+docker qdrant:
+docker run -d -p 6333:6333 qdrant/qdrant
+
+
+
+curl -X DELETE http://localhost:6333/collections/kopilkin_memorypip install mem0ai[nlp]
