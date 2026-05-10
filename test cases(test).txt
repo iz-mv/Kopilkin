@@ -1,0 +1,42 @@
+testing ai adding transactions by cmd:
+(venv) islammubarakov@Islams-MacBook-Air Kopilkin % curl -X POST http://localhost:8002/transactions \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user1", "amount": 5000, "category": "cafe", "date": "2026-05-01", "type": "expense"}'
+{"id":"f7bfdb31-5d13-4923-a6d7-ecd26f3172f4","user_id":"user1","amount":5000.0,"category":"cafe","date":"2026-05-01","type":"expense","description":null,"created_at":"2026-05-10T16:12:10.984217"}%
+(venv) islammubarakov@Islams-MacBook-Air Kopilkin % curl -X POST http://localhost:8002/transactions \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user1", "amount": 3000, "category": "transport", "date": "2026-05-02", "type": "expense"}'
+{"id":"af207bc5-0929-4e5e-aeed-41ae561214f2","user_id":"user1","amount":3000.0,"category":"transport","date":"2026-05-02","type":"expense","description":null,"created_at":"2026-05-10T16:12:31.446896"}%
+(venv) islammubarakov@Islams-MacBook-Air Kopilkin % curl -X POST http://localhost:8002/transactions \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user1", "amount": 50000, "category": "salary", "date": "2026-05-01", "type": "income"}'
+{"id":"6b16d41f-cf77-4e23-b6ac-4d3d86223c7e","user_id":"user1","amount":50000.0,"category":"salary","date":"2026-05-01","type":"income","description":null,"created_at":"2026-05-10T16:12:35.683629"}%
+
+
+test as it is:
+curl -X POST http://localhost:8004/chat \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user1", "message": "Where does my money go?"}'
+
+
+
+
+
+answers:
+(venv) islammubarakov@Islams-MacBook-Air Kopilkin % curl -X POST http://localhost:8004/chat \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user1", "message": "Where does my money go?"}'
+{"response":"Based on your data:\n\n*   **Biggest Expenses:** Transport (3000.0 RUB) and Cafe (5000.0 RUB) are your largest expenses.\n*   **Spending Breakdown:**\n    *   Cafe: 5000.0 RUB\n    *   Transport: 3000.0 RUB\n    *   Salary: 50000.0 RUB","agent_used":"orchestrator"}%
+
+
+(venv) islammubarakov@Islams-MacBook-Air Kopilkin % curl -X POST http://localhost:8004/chat \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user1", "message": "How can I save money?"}'
+{"response":"Okay, great news – a surplus of 3000 RUB is fantastic! Let’s really build on that. You’re right to identify “cafe” as a big area for potential savings – it’s currently eating up a significant chunk of your budget at 5000 RUB.\n\nGiven that, let's realistically look at this: you have 3000 RUB extra, and you spend 5000 RUB on cafes. That means reducing your cafe spending by even just 2000 RUB would *double* your immediate savings. \n\nHere’s a concrete plan:\n\n1.  **Track your cafe visits:** For the next week, really write down *every* time you go to a cafe and how much you spend. This will give you a precise picture.\n\n2.  **Small Swap, Big Impact:** Let's aim for a 2000 RUB reduction. That’s roughly 10 trips to the cafe.  Could you swap one cafe visit a week with making coffee and a snack at home? Even a simple sandwich can save you 300-500 RUB.\n\n3.  **Bring Your Own:** Seriously, a reusable cup and a packed lunch/snack will make a huge difference.\n\n4. **Celebrate Small Wins:**  Every 500 RUB saved, treat yourself to something small – you deserve it!\n\nLet me know how the tracking goes, and we can refine the plan further.  Don't aim for drastic changes immediately; small, consistent changes are much more sustainable.","agent_used":"orchestrator"}%
+
+
+(venv) islammubarakov@Islams-MacBook-Air Kopilkin % curl -X POST http://localhost:8004/chat \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user1", "message": "Куда уходят мои деньги?"}'
+{"response":"Ваши основные расходы:\n\n*   **Кафе:** 5000.0 RUB\n*   **Транспорт:** 3000.0 RUB\n*   **Зарплата:** 50000.0 RUB\n\nВ общей сложности, ваши расходы составляют 8000.0 RUB, а ваш доход - 50000.0 RUB.","agent_used":"orchestrator"}%   
+

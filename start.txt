@@ -3,3 +3,7 @@ uvicorn app.main:app --reload --port 8001
 
 cd frontend
 python -m http.server 5500
+
+
+uvicorn app.main:app --reload --port 8004 - ai
+
