@@ -1,4 +1,10 @@
+import os
 from mem0 import Memory
+
+
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 
 
 config = {
@@ -6,22 +12,22 @@ config = {
         "provider": "ollama",
         "config": {
             "model": "gemma3:4b",
-            "ollama_base_url": "http://localhost:11434",
+            "ollama_base_url": OLLAMA_URL,
         },
     },
     "embedder": {
         "provider": "ollama",
         "config": {
             "model": "nomic-embed-text",
-            "ollama_base_url": "http://localhost:11434",
+            "ollama_base_url": OLLAMA_URL,
         },
     },
     "vector_store": {
         "provider": "qdrant",
         "config": {
             "collection_name": "kopilkin_memory",
-            "host": "localhost",
-            "port": 6333,
+            "host": QDRANT_HOST,
+            "port": QDRANT_PORT,
             "embedding_model_dims": 768,
         },
     },
@@ -32,10 +38,6 @@ memory = Memory.from_config(config)
 
 
 def save_memory(user_id: str, message: str, response: str):
-    """
-    Saves user message and assistant response into mem0.
-    If memory fails, it prints the error but does not crash the agent-service.
-    """
     try:
         memory.add(
             [
@@ -44,16 +46,11 @@ def save_memory(user_id: str, message: str, response: str):
             ],
             user_id=user_id,
         )
-
     except Exception as e:
         print("MEMORY SAVE ERROR:", e)
 
 
 def get_memory(user_id: str, query: str) -> str:
-    """
-    Searches previous memories for this user.
-    If Qdrant/mem0 fails, it returns empty context instead of crashing /chat.
-    """
     try:
         results = memory.search(
             query=query,
@@ -64,7 +61,6 @@ def get_memory(user_id: str, query: str) -> str:
         if not results:
             return ""
 
-        # mem0 usually returns {"results": [...]}
         if isinstance(results, dict):
             memories = results.get("results", [])
         else:
@@ -90,9 +86,7 @@ def get_memory(user_id: str, query: str) -> str:
         if not memory_lines:
             return ""
 
-        memories_text = "\n".join(memory_lines)
-
-        return f"Previous context about this user:\n{memories_text}"
+        return "Previous context about this user:\n" + "\n".join(memory_lines)
 
     except Exception as e:
         print("MEMORY SEARCH ERROR:", e)

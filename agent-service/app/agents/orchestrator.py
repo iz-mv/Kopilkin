@@ -1,10 +1,11 @@
+import os
 import httpx
 from app.agents.analyst_agent import run_analyst
 from app.agents.advisor_agent import run_advisor
 from app.prompts.system_prompts import ORCHESTRATOR_PROMPT
 from app.memory.mem0_client import save_memory, get_memory
 
-OLLAMA_URL = "http://localhost:11434"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
 
 def route(user_message: str) -> str:

@@ -1,12 +1,14 @@
+import os
 import httpx
 from app.prompts.system_prompts import ANALYST_PROMPT
 
+TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://localhost:8002")
 
 def get_user_transactions(user_id: str) -> dict:
     """Gets real transaction data from transaction-service"""
     try:
         response = httpx.get(
-            f"http://localhost:8002/transactions/{user_id}/summary"
+            f"{TRANSACTION_SERVICE_URL}/transactions/{user_id}/summary"
         )
         return response.json()
     except Exception:

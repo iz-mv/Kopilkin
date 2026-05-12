@@ -15,3 +15,7 @@ docker run -d -p 6333:6333 qdrant/qdrant
 
 
 curl -X DELETE http://localhost:6333/collections/kopilkin_memorypip install mem0ai[nlp]
+
+
+Ollama пока оставляем локально на Mac, потому что она уже работает. В Docker-контейнере agent-service будет обращаться к Ollama через:
+http://host.docker.internal:11434

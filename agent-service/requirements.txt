@@ -2,3 +2,8 @@ fastapi
 uvicorn
 httpx
 pydantic
+mem0ai
+qdrant-client
+ollama
+langfuse
+python-dotenv
