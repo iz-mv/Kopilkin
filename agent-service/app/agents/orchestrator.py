@@ -1,5 +1,7 @@
 import os
 import httpx
+from langfuse.decorators import observe
+
 from app.agents.analyst_agent import run_analyst
 from app.agents.advisor_agent import run_advisor
 from app.prompts.system_prompts import ORCHESTRATOR_PROMPT
@@ -8,6 +10,7 @@ from app.memory.mem0_client import save_memory, get_memory
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
 
+@observe(name="router_agent")
 def route(user_message: str) -> str:
     # Sends user message to LLM and gets routing decision: analyst or advisor
     payload = {
@@ -34,6 +37,7 @@ def route(user_message: str) -> str:
     return decision
 
 
+@observe(name="orchestrator")
 def run_orchestrator(user_id: str, user_message: str) -> str:
     # Step 1: get relevant memories for this user
     memory_context = get_memory(user_id, user_message)

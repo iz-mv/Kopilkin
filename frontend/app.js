@@ -1,6 +1,7 @@
 const AUTH_API = "http://127.0.0.1:8001";
 const TRANSACTION_API = "http://127.0.0.1:8002";
 const SAVINGS_API = "http://127.0.0.1:8003";
+const AGENT_API = "http://127.0.0.1:8004";
 
 const EXPENSE_CATEGORIES = [
   "Restaurants",
@@ -341,6 +342,82 @@ function setupProfilePage() {
       }
     });
   }
+}
+
+function setupAIPage() {
+  const user = redirectToLoginIfNeeded();
+  if (!user) return;
+
+  setupLogoutButtons();
+
+  const avatar = document.querySelector(".avatar-circle");
+  if (avatar && user.name) {
+    avatar.textContent = user.name[0].toUpperCase();
+  }
+
+  const form = document.getElementById("aiChatForm");
+  const input = document.getElementById("aiChatInput");
+  const messages = document.getElementById("aiChatMessages");
+  const status = document.getElementById("aiChatStatus");
+  const sendBtn = document.getElementById("aiSendBtn");
+
+  if (!form || !input || !messages || !sendBtn) return;
+
+  function addMessage(text, type) {
+    const message = document.createElement("div");
+    message.className = `ai-page-message ai-page-message-${type}`;
+    message.textContent = text;
+
+    messages.appendChild(message);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const question = input.value.trim();
+    if (!question) return;
+
+    addMessage(question, "user");
+    input.value = "";
+
+    const loadingMessage = document.createElement("div");
+    loadingMessage.className = "ai-page-message ai-page-message-bot";
+    loadingMessage.textContent = "Thinking...";
+    messages.appendChild(loadingMessage);
+    messages.scrollTop = messages.scrollHeight;
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Waiting...";
+    if (status) status.textContent = "Kopilkin AI is analyzing your data...";
+
+    try {
+      const result = await apiRequest(`${AGENT_API}/chat`, {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: user.user_id,
+          message: question,
+        }),
+      });
+
+      loadingMessage.textContent = result.response || "No response from assistant.";
+      if (status) status.textContent = "";
+    } catch (error) {
+      loadingMessage.textContent = `AI error: ${error.message}`;
+      if (status) status.textContent = "Could not reach AI assistant.";
+    } finally {
+      sendBtn.disabled = false;
+      sendBtn.textContent = "Send message";
+      messages.scrollTop = messages.scrollHeight;
+    }
+  });
 }
 
 function setupLogoutButtons() {

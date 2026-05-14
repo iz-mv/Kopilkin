@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kopilkin - AI Assistant</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app-bg">
+  <div class="mobile-shell">
+    <header class="topbar">
+      <div>
+        <div class="small-label">Smart financial support</div>
+        <h1 class="page-title">AI Assistant</h1>
+      </div>
+      <div class="avatar-circle">AI</div>
+    </header>
+
+    <section class="card ai-page-card">
+      <div class="ai-page-intro">
+        <div class="ai-page-icon">🤖</div>
+        <div>
+          <h2 class="section-title">Kopilkin AI</h2>
+          <p class="muted-text">
+            Ask me about your spending, savings, financial habits, or goals.
+          </p>
+        </div>
+      </div>
+
+      <div class="ai-chat-box" id="aiChatMessages">
+        <div class="ai-message ai-message-bot">
+          Hi! I can analyze your transactions and help you save money.
+          Try asking: “I spend a lot on cafe, I want to save money.”
+        </div>
+      </div>
+
+      <form id="aiChatForm" class="ai-chat-form">
+        <textarea
+          id="aiChatInput"
+          rows="3"
+          placeholder="Ask Kopilkin AI..."
+          required
+        ></textarea>
+        <button type="submit" class="primary-btn full-btn" id="aiSendBtn">
+          Send message
+        </button>
+      </form>
+
+      <p id="aiChatStatus" class="message-text"></p>
+    </section>
+
+    <nav class="bottom-nav">
+      <a href="home.html" class="nav-item">Home</a>
+      <a href="goals.html" class="nav-item">Goals</a>
+      <a href="ai.html" class="nav-item active-nav">AI</a>
+      <a href="profile.html" class="nav-item">Profile</a>
+      <a href="#" class="nav-item" id="logoutBtn">Logout</a>
+    </nav>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    setupAIPage();
+  </script>
+</body>
+</html>

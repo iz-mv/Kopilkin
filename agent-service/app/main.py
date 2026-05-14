@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from langfuse.decorators import observe
+
 from app.agents.orchestrator import run_orchestrator
 
 app = FastAPI(title="Kopilkin Agent Service")
@@ -30,10 +32,13 @@ def root():
 
 
 @app.post("/chat", response_model=ChatResponse)
+@observe(name="chat_endpoint")
 def chat(request: ChatRequest):
-    # Run the orchestrator with user_id and message
     response = run_orchestrator(request.user_id, request.message)
+
     return {
         "response": response,
         "agent_used": "orchestrator"
     }
+
+

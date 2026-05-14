@@ -1,9 +1,13 @@
 import os
 import httpx
+from langfuse.decorators import observe
+
 from app.prompts.system_prompts import ANALYST_PROMPT
 
 TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://localhost:8002")
 
+
+@observe(name="transaction_service_call")
 def get_user_transactions(user_id: str) -> dict:
     """Gets real transaction data from transaction-service"""
     try:
@@ -15,6 +19,7 @@ def get_user_transactions(user_id: str) -> dict:
         return {}
 
 
+@observe(name="analyst_agent")
 def run_analyst(user_id: str, user_message: str, ollama_url: str) -> str:
     """
     Analyst agent — fetches real data and analyzes it.

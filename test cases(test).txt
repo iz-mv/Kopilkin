@@ -38,5 +38,24 @@ answers:
 (venv) islammubarakov@Islams-MacBook-Air Kopilkin % curl -X POST http://localhost:8004/chat \
   -H "Content-Type: application/json" \
   -d '{"user_id": "user1", "message": "Куда уходят мои деньги?"}'
-{"response":"Ваши основные расходы:\n\n*   **Кафе:** 5000.0 RUB\n*   **Транспорт:** 3000.0 RUB\n*   **Зарплата:** 50000.0 RUB\n\nВ общей сложности, ваши расходы составляют 8000.0 RUB, а ваш доход - 50000.0 RUB.","agent_used":"orchestrator"}%   
+{"response":"Ваши основные расходы:\n\n*   **Кафе:** 5000.0 RUB\n*   **Транспорт:** 3000.0 RUB\n*   **Зарплата:** 50000.0 RUB\n\nВ общей сложности, ваши расходы составляют 8000.0 RUB, а ваш доход - 50000.0 RUB.","agent_used":"orchestrator"}%
 
+
+
+User
+ ↓
+localhost:8004/chat
+ ↓
+agent-service container
+ ├── обращается к Ollama на Mac → host.docker.internal:11434
+ ├── обращается к transaction-service на Mac → host.docker.internal:8002
+ ├── сохраняет/ищет memory в Qdrant → qdrant:6333
+ └── позже будет отправлять traces в Langfuse → langfuse:3000
+
+
+agent-service в Docker
+qdrant в Docker
+Langfuse поднят
+Ollama локально
+transaction-service локально
+/chat отвечает

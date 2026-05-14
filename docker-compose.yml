@@ -12,8 +12,16 @@ services:
       TRANSACTION_SERVICE_URL: "http://host.docker.internal:8002"
       QDRANT_HOST: "qdrant"
       QDRANT_PORT: "6333"
+
+      LANGFUSE_PUBLIC_KEY: "pk-lf-8e68e5a6-89f8-49f4-b08c-8b04167ea257"
+      LANGFUSE_SECRET_KEY: "sk-lf-7f08364b-673e-4c8f-9825-3699ca37c805"
+      LANGFUSE_HOST: "http://langfuse:3000"
+      LANGFUSE_BASE_URL: "http://langfuse:3000"
     depends_on:
-      - qdrant
+      qdrant:
+        condition: service_started
+      langfuse:
+        condition: service_started
     restart: unless-stopped
 
   qdrant:
@@ -25,5 +33,39 @@ services:
       - qdrant_data:/qdrant/storage
     restart: unless-stopped
 
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: kopilkin-langfuse
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://langfuse:langfuse@langfuse-db:5432/langfuse"
+      NEXTAUTH_SECRET: "kopilkin-nextauth-secret-local-dev-123456789"
+      SALT: "kopilkin-salt-local-dev-123456789"
+      NEXTAUTH_URL: "http://localhost:3000"
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  langfuse-db:
+    image: postgres:15
+    container_name: kopilkin-langfuse-db
+    environment:
+      POSTGRES_USER: "langfuse"
+      POSTGRES_PASSWORD: "langfuse"
+      POSTGRES_DB: "langfuse"
+    volumes:
+      - langfuse_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
   qdrant_data:
+  langfuse_db_data:

@@ -1,5 +1,6 @@
 import os
 from mem0 import Memory
+from langfuse.decorators import observe
 
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
@@ -37,6 +38,7 @@ config = {
 memory = Memory.from_config(config)
 
 
+@observe(name="memory_save")
 def save_memory(user_id: str, message: str, response: str):
     try:
         memory.add(
@@ -50,6 +52,7 @@ def save_memory(user_id: str, message: str, response: str):
         print("MEMORY SAVE ERROR:", e)
 
 
+@observe(name="memory_search")
 def get_memory(user_id: str, query: str) -> str:
     try:
         results = memory.search(

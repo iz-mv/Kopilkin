@@ -5,5 +5,5 @@ pydantic
 mem0ai
 qdrant-client
 ollama
-langfuse
+langfuse==2.60.9
 python-dotenv
