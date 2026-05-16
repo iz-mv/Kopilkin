@@ -1,0 +1,34 @@
+[
+  {
+    "id": "ru_advice_cafe_transport",
+    "message": "Привет! Я трачу 5000 рублей в месяц на кафе и 3000 на транспорт. Что посоветуешь?",
+    "expected_route": "advisor",
+    "expected_language": "ru",
+    "must_reference": ["5000", "3000", "кафе", "транспорт"],
+    "description": "Checks that the system gives practical advice and keeps the Russian language."
+  },
+  {
+    "id": "en_spending_analysis",
+    "message": "Where does my money go?",
+    "expected_route": "analyst",
+    "expected_language": "en",
+    "must_reference": ["expense", "category"],
+    "description": "Checks analyst routing and category-based spending analysis."
+  },
+  {
+    "id": "en_saving_advice",
+    "message": "I spend a lot on cafe, I want to save money",
+    "expected_route": "advisor",
+    "expected_language": "en",
+    "must_reference": ["cafe", "save"],
+    "description": "Checks advisor path with analyst-first chaining."
+  },
+  {
+    "id": "ru_memory_followup",
+    "message": "А что ты помнишь про мои расходы?",
+    "expected_route": "analyst",
+    "expected_language": "ru",
+    "must_reference": [],
+    "description": "Checks that memory search does not crash and previous context can be used."
+  }
+]

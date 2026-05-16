@@ -7,3 +7,4 @@ qdrant-client
 ollama
 langfuse==2.60.9
 python-dotenv
+prometheus-client

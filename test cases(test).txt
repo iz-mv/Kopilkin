@@ -59,3 +59,27 @@ Langfuse поднят
 Ollama локально
 transaction-service локально
 /chat отвечает
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+curl http://127.0.0.1:8004/metrics
+
+kopilkin_agent_chat_requests_total
+kopilkin_agent_chat_errors_total
+kopilkin_agent_chat_latency_seconds
+
+docker compose logs -f agent-service
