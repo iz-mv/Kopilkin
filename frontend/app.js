@@ -609,27 +609,36 @@ function renderGoals(goals) {
   }
 
   container.innerHTML = goals
-    .map(
-      (goal) => `
+    .map((goal) => {
+      const currentAmount = Number(goal.current_amount || 0);
+      const targetAmount = Number(goal.target_amount || 0);
+
+      const progressPercent = targetAmount > 0
+        ? Math.round((currentAmount / targetAmount) * 100)
+        : 0;
+
+      const safeProgressPercent = Math.min(Math.max(progressPercent, 0), 100);
+
+      return `
         <div class="goal-card">
           <div class="goal-title">${goal.title}</div>
           <div class="goal-meta">
-            <span>${formatMoney(goal.current_amount)}</span>
-            <span>of ${formatMoney(goal.target_amount)}</span>
+            <span>${formatMoney(currentAmount)}</span>
+            <span>of ${formatMoney(targetAmount)}</span>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" style="width: ${Math.min(goal.progress_percent, 100)}%"></div>
+            <div class="progress-fill" style="width: ${safeProgressPercent}%"></div>
           </div>
           <div class="goal-meta">
-            <span>${goal.progress_percent}% completed</span>
+            <span>${progressPercent}% completed</span>
           </div>
           <div class="goal-actions">
-            <input type="number" step="0.01" placeholder="Use + or - amount" id="goal-input-${goal.id}" />
+            <input type="number" step="0.01" placeholder="Use + amount" id="goal-input-${goal.id}" />
             <button class="primary-btn" onclick="addMoneyToGoal('${goal.id}')">Apply</button>
           </div>
         </div>
-      `
-    )
+      `;
+    })
     .join("");
 }
 
@@ -638,14 +647,18 @@ async function addMoneyToGoal(goalId) {
   const user = getCurrentUser();
   const amount = parseFloat(input.value);
 
-  if (!amount || amount === 0) return;
+  if (!amount || amount <= 0) {
+    alert("Amount must be greater than 0");
+    return;
+  }
 
   try {
     await apiRequest(`${SAVINGS_API}/goals/${goalId}/add`, {
       method: "PATCH",
-      body: JSON.stringify({ amount_change: amount }),
+      body: JSON.stringify({ amount: amount }),
     });
 
+    input.value = "";
     loadGoals(user.user_id);
   } catch (error) {
     alert(error.message);

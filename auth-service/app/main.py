@@ -1,8 +1,12 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, EmailStr
-from typing import Dict
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 import uuid
+
+from app.database import Base, engine, get_db
+from app.models import User
+from app.schemas import RegisterRequest, LoginRequest, UserResponse, UserUpdateRequest
+
 
 app = FastAPI(title="Kopilkin Auth Service")
 
@@ -14,27 +18,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-users_db: Dict[str, dict] = {}
+Base.metadata.create_all(bind=engine)
 
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str
-    name: str
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class UserResponse(BaseModel):
-    id: str
-    email: EmailStr
-    name: str
-
-class UserUpdateRequest(BaseModel):
-    name: str
 
 @app.get("/")
 def root():
@@ -42,67 +27,64 @@ def root():
 
 
 @app.post("/register", response_model=UserResponse)
-def register(data: RegisterRequest):
-    for user in users_db.values():
-        if user["email"] == data.email:
-            raise HTTPException(status_code=400, detail="Email already registered")
+def register(data: RegisterRequest, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.email == data.email).first()
 
-    user_id = str(uuid.uuid4())
-    users_db[user_id] = {
-        "id": user_id,
-        "email": data.email,
-        "password": data.password,
-        "name": data.name,
-    }
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-    return {
-        "id": user_id,
-        "email": data.email,
-        "name": data.name,
-    }
+    user = User(
+        id=str(uuid.uuid4()),
+        email=data.email,
+        password=data.password,
+        name=data.name,
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return user
 
 
 @app.post("/login")
-def login(data: LoginRequest):
-    for user in users_db.values():
-        if user["email"] == data.email and user["password"] == data.password:
-            return {
-                "message": "Login successful",
-                "access_token": f"fake-token-{user['id']}",
-                "user_id": user["id"],
-                "name": user["name"],
-            }
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+
+    if user and user.password == data.password:
+        return {
+            "message": "Login successful",
+            "access_token": f"fake-token-{user.id}",
+            "user_id": user.id,
+            "name": user.name,
+        }
 
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 
-
 @app.get("/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: str):
-    user = users_db.get(user_id)
+def get_user(user_id: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return {
-        "id": user["id"],
-        "email": user["email"],
-        "name": user["name"],
-    }
+    return user
 
 
 @app.patch("/users/{user_id}", response_model=UserResponse)
-def update_user(user_id: str, data: UserUpdateRequest):
-    user = users_db.get(user_id)
+def update_user(user_id: str, data: UserUpdateRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user["name"] = data.name
+    user.name = data.name
 
-    return {
-        "id": user["id"],
-        "email": user["email"],
-        "name": user["name"],
-    }
+    db.commit()
+    db.refresh(user)
+
+    return user
 
 
 @app.get("/google/login")

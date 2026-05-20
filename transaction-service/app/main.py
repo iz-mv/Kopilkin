@@ -1,9 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Dict, List, Optional
+from sqlalchemy.orm import Session
 import uuid
-from datetime import datetime
+
+from app.database import Base, engine, get_db
+from app.models import Transaction
+from app.schemas import TransactionCreate, TransactionResponse, SummaryResponse
+
 
 app = FastAPI(title="Kopilkin Transaction Service")
 
@@ -15,27 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-transactions_db: Dict[str, dict] = {}
-
-
-class TransactionCreate(BaseModel):
-    user_id: str
-    amount: float
-    category: str
-    date: str
-    type: str  # expense or income
-    description: Optional[str] = None
-
-
-class TransactionResponse(BaseModel):
-    id: str
-    user_id: str
-    amount: float
-    category: str
-    date: str
-    type: str
-    description: Optional[str] = None
-    created_at: str
+Base.metadata.create_all(bind=engine)
 
 
 @app.get("/")
@@ -44,59 +27,83 @@ def root():
 
 
 @app.post("/transactions", response_model=TransactionResponse)
-def create_transaction(data: TransactionCreate):
-    if data.type not in ["expense", "income"]:
-        raise HTTPException(status_code=400, detail="type must be 'expense' or 'income'")
+def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
+    if data.type not in ["income", "expense"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Transaction type must be either 'income' or 'expense'"
+        )
 
-    if data.amount <= 0:
-        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+    transaction = Transaction(
+        id=str(uuid.uuid4()),
+        user_id=data.user_id,
+        amount=data.amount,
+        category=data.category,
+        type=data.type,
+        description=data.description,
+        date=data.date,
+    )
 
-    transaction_id = str(uuid.uuid4())
-    transaction = {
-        "id": transaction_id,
-        "user_id": data.user_id,
-        "amount": data.amount,
-        "category": data.category,
-        "date": data.date,
-        "type": data.type,
-        "description": data.description,
-        "created_at": datetime.utcnow().isoformat(),
-    }
-    transactions_db[transaction_id] = transaction
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+
     return transaction
 
 
-@app.get("/transactions/{user_id}", response_model=List[TransactionResponse])
-def get_user_transactions(user_id: str):
-    user_transactions = [t for t in transactions_db.values() if t["user_id"] == user_id]
-    user_transactions.sort(key=lambda t: (t["date"], t["created_at"]), reverse=True)
-    return user_transactions
+@app.get("/transactions/{user_id}", response_model=list[TransactionResponse])
+def get_user_transactions(user_id: str, db: Session = Depends(get_db)):
+    transactions = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id)
+        .order_by(Transaction.created_at.desc())
+        .all()
+    )
+
+    return transactions
 
 
-@app.delete("/transactions/{transaction_id}")
-def delete_transaction(transaction_id: str):
-    transaction = transactions_db.get(transaction_id)
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found")
+@app.get("/transactions/{user_id}/summary", response_model=SummaryResponse)
+def get_user_summary(user_id: str, db: Session = Depends(get_db)):
+    transactions = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id)
+        .all()
+    )
 
-    del transactions_db[transaction_id]
-    return {"message": "Transaction deleted successfully"}
-
-
-@app.get("/transactions/{user_id}/summary")
-def get_summary(user_id: str):
-    user_transactions = [t for t in transactions_db.values() if t["user_id"] == user_id]
-
-    total_expense = sum(t["amount"] for t in user_transactions if t["type"] == "expense")
-    total_income = sum(t["amount"] for t in user_transactions if t["type"] == "income")
-
-    by_category = {}
-    for t in user_transactions:
-        by_category[t["category"]] = by_category.get(t["category"], 0) + t["amount"]
+    total_income = sum(t.amount for t in transactions if t.type == "income")
+    total_expense = sum(t.amount for t in transactions if t.type == "expense")
+    balance = total_income - total_expense
 
     return {
         "user_id": user_id,
-        "total_expense": total_expense,
         "total_income": total_income,
-        "by_category": by_category,
+        "total_expense": total_expense,
+        "balance": balance,
+        "transactions_count": len(transactions),
+    }
+
+
+@app.get("/summary/{user_id}", response_model=SummaryResponse)
+def get_user_summary_alias(user_id: str, db: Session = Depends(get_db)):
+    return get_user_summary(user_id, db)
+
+
+@app.delete("/transactions/{transaction_id}")
+def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
+    transaction = (
+        db.query(Transaction)
+        .filter(Transaction.id == transaction_id)
+        .first()
+    )
+
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    db.delete(transaction)
+    db.commit()
+
+    return {
+        "message": "Transaction deleted successfully",
+        "transaction_id": transaction_id,
     }
