@@ -6,6 +6,7 @@ import uuid
 from app.database import Base, engine, get_db
 from app.models import User
 from app.schemas import RegisterRequest, LoginRequest, UserResponse, UserUpdateRequest
+from app.events import publish_event
 
 
 app = FastAPI(title="Kopilkin Auth Service")
@@ -43,6 +44,17 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    publish_event(
+        topic="user.registered",
+        key=user.id,
+        event={
+            "event_type": "user.registered",
+            "user_id": user.id,
+            "email": user.email,
+            "name": user.name,
+        },
+    )
 
     return user
 

@@ -24,3 +24,6 @@ http://host.docker.internal:11434
 
 docker exec -it kopilkin-postgres psql -U kopilkin -d savings_db
 SELECT * FROM savings_goals;
+
+
+docker compose up -d kafka kafka-ui

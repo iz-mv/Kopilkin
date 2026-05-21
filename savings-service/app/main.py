@@ -6,6 +6,7 @@ import uuid
 from app.database import Base, engine, get_db
 from app.models import SavingsGoal
 from app.schemas import SavingsGoalCreate, SavingsGoalUpdate, SavingsGoalResponse
+from app.events import publish_event
 
 
 app = FastAPI(title="Kopilkin Savings Service")
@@ -40,6 +41,19 @@ def create_goal(data: SavingsGoalCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(goal)
 
+    publish_event(
+        topic="goal.created",
+        key=goal.user_id,
+        event={
+            "event_type": "goal.created",
+            "goal_id": goal.id,
+            "user_id": goal.user_id,
+            "title": goal.title,
+            "target_amount": goal.target_amount,
+            "current_amount": goal.current_amount,
+        },
+    )
+
     return goal
 
 
@@ -73,6 +87,20 @@ def add_money_to_goal(
 
     db.commit()
     db.refresh(goal)
+
+    publish_event(
+        topic="goal.updated",
+        key=goal.user_id,
+        event={
+            "event_type": "goal.updated",
+            "goal_id": goal.id,
+            "user_id": goal.user_id,
+            "title": goal.title,
+            "amount_change": data.amount,
+            "target_amount": goal.target_amount,
+            "current_amount": goal.current_amount,
+        },
+    )
 
     return goal
 

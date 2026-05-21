@@ -6,6 +6,7 @@ import uuid
 from app.database import Base, engine, get_db
 from app.models import Transaction
 from app.schemas import TransactionCreate, TransactionResponse, SummaryResponse
+from app.events import publish_event
 
 
 app = FastAPI(title="Kopilkin Transaction Service")
@@ -47,6 +48,21 @@ def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
+
+    publish_event(
+        topic="transaction.created",
+        key=transaction.user_id,
+        event={
+            "event_type": "transaction.created",
+            "transaction_id": transaction.id,
+            "user_id": transaction.user_id,
+            "amount": transaction.amount,
+            "category": transaction.category,
+            "type": transaction.type,
+            "description": transaction.description,
+            "date": transaction.date,
+        },
+    )
 
     return transaction
 
@@ -100,8 +116,25 @@ def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
+    deleted_event = {
+        "event_type": "transaction.deleted",
+        "transaction_id": transaction.id,
+        "user_id": transaction.user_id,
+        "amount": transaction.amount,
+        "category": transaction.category,
+        "type": transaction.type,
+        "description": transaction.description,
+        "date": transaction.date,
+    }
+
     db.delete(transaction)
     db.commit()
+
+    publish_event(
+        topic="transaction.deleted",
+        key=deleted_event["user_id"],
+        event=deleted_event,
+    )
 
     return {
         "message": "Transaction deleted successfully",
