@@ -34,10 +34,13 @@ services:
     environment:
       AUTH_DATABASE_URL: "postgresql://kopilkin:kopilkin_password@postgres:5432/auth_db"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      REDIS_URL: "redis://redis:6379/0"
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_started
+      redis:
         condition: service_started
     restart: unless-stopped
 
@@ -51,9 +54,14 @@ services:
     environment:
       TRANSACTION_DATABASE_URL: "postgresql://kopilkin:kopilkin_password@postgres:5432/transaction_db"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      REDIS_URL: "redis://redis:6379/0"
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   savings-service:
@@ -110,6 +118,15 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:9092"
     depends_on:
       - kafka
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: kopilkin-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
 
   postgres:
@@ -178,3 +195,4 @@ volumes:
   langfuse_db_data:
   postgres_data:
   kafka_data:
+  redis_data:

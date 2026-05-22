@@ -7,6 +7,7 @@ from app.database import Base, engine, get_db
 from app.models import Transaction
 from app.schemas import TransactionCreate, TransactionResponse, SummaryResponse
 from app.events import publish_event
+from app.cache import get_cache, set_cache, delete_cache
 
 
 app = FastAPI(title="Kopilkin Transaction Service")
@@ -64,6 +65,9 @@ def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
         },
     )
 
+    # the financial summary changed, so the old redis cache must be removed
+    delete_cache(f"summary:{transaction.user_id}")
+
     return transaction
 
 
@@ -81,6 +85,12 @@ def get_user_transactions(user_id: str, db: Session = Depends(get_db)):
 
 @app.get("/transactions/{user_id}/summary", response_model=SummaryResponse)
 def get_user_summary(user_id: str, db: Session = Depends(get_db)):
+    cache_key = f"summary:{user_id}"
+
+    cached_summary = get_cache(cache_key)
+    if cached_summary:
+        return cached_summary
+
     transactions = (
         db.query(Transaction)
         .filter(Transaction.user_id == user_id)
@@ -91,13 +101,18 @@ def get_user_summary(user_id: str, db: Session = Depends(get_db)):
     total_expense = sum(t.amount for t in transactions if t.type == "expense")
     balance = total_income - total_expense
 
-    return {
+    summary = {
         "user_id": user_id,
         "total_income": total_income,
         "total_expense": total_expense,
         "balance": balance,
         "transactions_count": len(transactions),
     }
+
+    # storing summary in redis for 60 seconds
+    set_cache(cache_key, summary, ttl_seconds=60)
+
+    return summary
 
 
 @app.get("/summary/{user_id}", response_model=SummaryResponse)
@@ -135,6 +150,9 @@ def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
         key=deleted_event["user_id"],
         event=deleted_event,
     )
+
+    #the financial summary changed, so the old redis cache must be removed
+    delete_cache(f"summary:{deleted_event['user_id']}")
 
     return {
         "message": "Transaction deleted successfully",

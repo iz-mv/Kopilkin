@@ -27,3 +27,34 @@ SELECT * FROM savings_goals;
 
 
 docker compose up -d kafka kafka-ui
+
+
+REDIS:
+
+1. transaction-service
+   key: summary:{user_id}
+   purpose: cache calculated financial summary
+   ttl: 60 seconds
+   invalidation: on transaction.created / transaction.deleted
+
+2. auth-service
+   key: user:{user_id}
+   purpose: cache user profile
+   ttl: 300 seconds
+   invalidation: on profile update
+
+3. api-gateway later
+   key: rate_limit:{client_ip}
+   purpose: request rate limiting
+   ttl: 60 seconds
+
+
+curl http://127.0.0.1:8002/transactions/e38fa670-175d-420e-b5c8-5e6de85cee17/summary
+docker logs kopilkin-transaction-service --tail=50
+x2
+cache hit
+
+
+curl http://127.0.0.1:8001/users/e38fa670-175d-420e-b5c8-5e6de85cee17
+docker logs kopilkin-auth-service --tail=50
+x2
