@@ -1,92 +1,189 @@
 # Kopilkin
 
-Kopilkin is a mobile-first personal finance web application with a multi-agent AI assistant.
+**Kopilkin** is a mobile-first personal finance web application with microservices, event-driven communication, caching, a routing layer, a recommendation service, and a local multi-agent AI assistant.
+
+**Author:** Mubarakov Islam  
+**Current architecture version:** Block 3 / updated C4 architecture  
+**Main public entrypoint for the application backend:** `http://127.0.0.1:8088`
+
+---
+
+## 1. What the system does
 
 Users can:
 
 - register and log in;
 - add income and expense transactions;
-- create savings goals;
-- ask an AI assistant where their money goes and how to save money.
+- view financial summaries;
+- create and update savings goals;
+- receive smart recommendations based on spending behavior;
+- ask a local AI assistant to analyze expenses and give budgeting advice.
 
-## Services
+The project started as a simple MVP and was extended into a microservice-based system for the software engineering task block.
 
-| Service | Port | Description |
-|---|---:|---|
-| frontend | 5500 | HTML/CSS/JS interface |
-| auth-service | 8001 | registration, login, user profile |
-| transaction-service | 8002 | income/expense transactions and summary |
-| savings-service | 8003 | savings goals |
-| agent-service | 8004 | multi-agent AI assistant |
-| qdrant | 6333 | vector memory database |
-| langfuse | 3000 | LLM/agent tracing UI |
+---
 
-## Multi-agent system
-
-The AI assistant contains several integrated agents:
-
-- **Orchestrator Agent** - coordinates the full flow.
-- **Router Agent** - chooses analyst or advisor path.
-- **Analyst Agent** - retrieves and analyzes real transaction data.
-- **Advisor Agent** - gives saving advice based on Analyst output.
-
-Flow:
+## 2. Current architecture summary
 
 ```text
-User -> Frontend -> Agent Service /chat
-     -> Orchestrator -> Memory Search -> Router
-     -> Analyst -> Advisor if needed
-     -> Memory Save -> Response
+Frontend :5500
+   ↓
+Nginx Load Balancer :8088
+   ↓
+API Gateway service, 2 Docker instances
+   ↓
+   ├── Auth Service        → PostgreSQL auth_db + Redis cache + Kafka events
+   ├── Transaction Service → PostgreSQL transaction_db + Redis cache + Kafka events
+   ├── Savings Service     → PostgreSQL savings_db + Kafka events
+   ├── Agent Service       → Ollama + Mem0 + Qdrant + Langfuse + Prometheus metrics
+   └── RecSys Service      → Transaction Service + Kafka events
 ```
 
-## LLM
-
-The local LLM engine is **Ollama**.
-
-Tested models:
-
-- `llama3.2:3b`
-- `qwen2.5:3b`
-- `gemma3:4b`
-
-Selected model:
+Supporting infrastructure:
 
 ```text
-gemma3:4b
+PostgreSQL 16       core business data, logically separated databases
+Kafka 3.8           event log and event-driven integration
+Kafka UI            topic/message inspection
+Redis 7             cache and rate limiter counters
+Qdrant              vector memory for the AI assistant
+Langfuse + Postgres LLM/agent traces
+Nginx               load balancing between API Gateway instances
+Ollama              local LLM runtime on the host machine
 ```
 
-Reason: best balance between Russian language quality, context understanding, usefulness, and low hallucination tendency in local tests.
+---
 
-## Memory
+## 3. Services and ports
 
-Long-term memory is implemented with:
+| Component | Port | Type | Responsibility |
+|---|---:|---|---|
+| `frontend` | `5500` | Static HTML/CSS/JS | Mobile-first user interface |
+| `nginx-balancer` | `8088` | Nginx | Public backend entrypoint and load balancer |
+| `api-gateway-1` | internal `8000` | FastAPI | Routing and Redis-based rate limiting |
+| `api-gateway-2` | internal `8000` | FastAPI | Second gateway instance for load balancing |
+| `auth-service` | `8001` | FastAPI | Registration, login, user profile |
+| `transaction-service` | `8002` | FastAPI | Income/expense transactions and summaries |
+| `savings-service` | `8003` | FastAPI | Savings goals |
+| `agent-service` | `8004` | FastAPI | Multi-agent AI assistant |
+| `recsys-service` | `8005` | FastAPI | Smart recommendations |
+| `kafka-ui` | `8080` | Web UI | Kafka topic inspection |
+| `postgres` | `5432` | PostgreSQL | `auth_db`, `transaction_db`, `savings_db` |
+| `redis` | `6379` | Redis | Cache and rate limit counters |
+| `qdrant` | `6333` | Vector DB | Long-term AI memory |
+| `langfuse` | `3000` | Web UI | LLM/agent observability |
 
-- **Mem0** as the memory layer;
-- **Qdrant** as the vector database;
-- **Ollama `nomic-embed-text`** as the embedding model.
+---
 
-## Observability
+## 4. Block 3 requirements covered by the current architecture
 
-Implemented:
+### 5. Communication between microservices via Kafka / EDA
 
-- Langfuse traces for the full agent flow.
-- Prometheus-compatible `/metrics` endpoint in agent-service.
-- Structured logs in agent-service.
+Kafka is used as the event backbone. Services publish business events after important state changes.
 
-Important traced spans:
+Current topics:
 
-- `chat_endpoint`
-- `orchestrator`
-- `memory_search`
-- `router_agent`
-- `analyst_agent`
-- `transaction_service_call`
-- `advisor_agent`
-- `memory_save`
+```text
+user.registered
+transaction.created
+transaction.deleted
+goal.created
+goal.updated
+recommendation.requested
+recommendation.generated
+```
 
-## Run locally
+Implemented producers:
 
-### 1. Start Ollama locally
+- `auth-service/app/events.py`
+- `transaction-service/app/events.py`
+- `savings-service/app/events.py`
+- `recsys-service/app/events.py`
+
+The current implementation mainly uses Kafka as an event log / asynchronous integration base. This is enough to demonstrate Event-Driven Architecture, and it can later be extended with consumers for analytics, notifications, fraud checks, or materialized recommendation views.
+
+### 6. Data layer
+
+Core business data is stored in PostgreSQL using a logical database-per-service pattern:
+
+| Service | Database | Main table |
+|---|---|---|
+| Auth Service | `auth_db` | `users` |
+| Transaction Service | `transaction_db` | `transactions` |
+| Savings Service | `savings_db` | `savings_goals` |
+
+Additional storage:
+
+| Component | Storage role |
+|---|---|
+| Qdrant | Vector memory for AI assistant |
+| Redis | Cache and operational counters |
+| Kafka | Event log |
+| Langfuse DB | LLM trace storage |
+
+### 7. Redis-like caching
+
+Redis is used for:
+
+```text
+user:{user_id}                      user profile cache, TTL 300 seconds
+summary:{user_id}                   transaction summary cache, TTL 60 seconds
+rate_limit:{client_ip}:{window}     API Gateway rate limiter counter
+```
+
+### 8. Routing layer
+
+The routing layer is implemented as:
+
+```text
+Frontend → Nginx Load Balancer → API Gateway replicas → Microservices
+```
+
+The API Gateway routes:
+
+```text
+/auth/*              → auth-service
+/transactions/*      → transaction-service
+/summary/*           → transaction-service
+/goals/*             → savings-service
+/agent/*             → agent-service
+/recommendations/*   → recsys-service
+```
+
+Rate limiting is implemented inside the gateway with Redis counters.
+
+### 9. C4 Diagrams
+
+The updated C4 diagrams are stored in:
+
+```text
+Documentation/Block3-C4/
+```
+
+The package contains 7 updated diagrams:
+
+1. C4 L1 — System Context
+2. C4 L2 — Container Overview
+3. C4 L2 — Data, Events, Routing and Cache View
+4. C4 L3 — API Gateway Components
+5. C4 L3 — Transaction Service Components
+6. C4 L3 — AI Agent Service Components
+7. C4 Dynamic — Add Transaction, Cache Invalidation, Kafka Event and Recommendation Refresh
+
+Available formats:
+
+```text
+Documentation/Block3-C4/images/          PNG images for report/screenshots
+Documentation/Block3-C4/graphviz_dot/    editable Graphviz DOT sources
+Documentation/Block3-C4/mermaid/         Mermaid sources
+Documentation/Block3-C4/structurizr/     Structurizr DSL workspace
+```
+
+---
+
+## 5. Run locally
+
+### 1. Start Ollama on the host machine
 
 ```bash
 ollama serve
@@ -94,32 +191,13 @@ ollama pull gemma3:4b
 ollama pull nomic-embed-text
 ```
 
-### 2. Start Docker infrastructure and agent service
+### 2. Start Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-### 3. Start business services locally
-
-In separate terminals:
-
-```bash
-cd auth-service
-uvicorn app.main:app --reload --port 8001
-```
-
-```bash
-cd transaction-service
-uvicorn app.main:app --reload --port 8002
-```
-
-```bash
-cd savings-service
-uvicorn app.main:app --reload --port 8003
-```
-
-### 4. Start frontend
+### 3. Start frontend
 
 ```bash
 cd frontend
@@ -132,45 +210,61 @@ Open:
 http://127.0.0.1:5500/login.html
 ```
 
-## Test agent manually
+---
+
+## 6. Useful local URLs
+
+| URL | Purpose |
+|---|---|
+| `http://127.0.0.1:5500/login.html` | Frontend login page |
+| `http://127.0.0.1:8088/health` | Load-balanced API Gateway health check |
+| `http://127.0.0.1:8080` | Kafka UI |
+| `http://127.0.0.1:3000` | Langfuse UI |
+| `http://127.0.0.1:8004/metrics` | Agent Service Prometheus metrics |
+| `http://127.0.0.1:6333/dashboard` | Qdrant dashboard, if enabled by image version |
+
+---
+
+## 7. Example API checks
+
+### Gateway health through Nginx balancer
 
 ```bash
-curl -X POST http://127.0.0.1:8004/chat \
+curl http://127.0.0.1:8088/health
+```
+
+Expected result should include one of the gateway instance names:
+
+```json
+{
+  "service": "api-gateway",
+  "instance": "api-gateway-1",
+  "status": "running",
+  "rate_limit_per_minute": 60
+}
+```
+
+Repeated requests may show `api-gateway-1` and `api-gateway-2`, depending on balancing.
+
+### Create a transaction through the gateway
+
+```bash
+curl -X POST http://127.0.0.1:8088/transactions \
   -H "Content-Type: application/json" \
-  -d '{"user_id":"test-user","message":"Привет! Я трачу 5000 рублей в месяц на кафе и 3000 на транспорт. Что посоветуешь?"}'
+  -d '{
+    "user_id": "demo-user",
+    "amount": 500,
+    "category": "Groceries",
+    "type": "expense",
+    "description": "Test transaction",
+    "date": "2026-05-22"
+  }'
 ```
 
-## Run evaluations
+This should:
 
-```bash
-python evals/run_evals.py
-```
+1. store the transaction in `transaction_db`;
+2. publish `transaction.created` to Kafka;
+3. invalidate `summary:demo-user` in Redis.
 
-## Documentation for Task Block 2
-
-Main files:
-
-```text
-Documentation/task2/TASK_BLOCK_2_MULTIAGENT_REPORT.md
-Documentation/task2/AGENT_SPEC.md
-Documentation/task2/LLM_COMPARISON.md
-Documentation/task2/MEMORY_MANAGEMENT.md
-Documentation/task2/OBSERVABILITY.md
-Documentation/task2/EVALUATION_PLAN.md
-Documentation/task2/ISOLATION_STRATEGY.md
-Documentation/task2/FRAMEWORKS_CONSIDERED.md
-Documentation/task2/DEFENSE_QA.md
-```
-
-Agent diagrams:
-
-```text
-Documentation/agent-diagrams/
-```
-
-## Known limitations
-
-- Business services still use in-memory storage in the MVP.
-- Full alerting is planned but not fully deployed.
-- Secrets should be moved to `.env` or a secret manager in production.
-- Local LLM response time depends on student hardware.
+---

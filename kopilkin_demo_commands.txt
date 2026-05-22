@@ -1,0 +1,472 @@
+KOPILKIN TASK BLOCK 3 - DEMO COMMANDS
+Student: Mubarakov Islam
+Project: Kopilkin
+User ID for demo: e38fa670-175d-420e-b5c8-5e6de85cee17
+
+============================================================
+0. IMPORTANT
+============================================================
+
+Run commands from the project root folder, where docker-compose.yml is located.
+
+DO NOT run:
+docker compose down -v
+
+Because -v removes volumes and can delete PostgreSQL/Kafka/Redis data.
+
+Recommended clean restart:
+docker compose down --remove-orphans
+docker compose up -d --build
+
+Frontend is started separately:
+cd frontend
+python3 -m http.server 5500
+
+Frontend URL:
+http://127.0.0.1:5500/login.html
+
+Main backend entry point:
+http://127.0.0.1:8088
+
+Kafka UI:
+http://127.0.0.1:8080
+
+Langfuse UI:
+http://127.0.0.1:3000
+
+
+============================================================
+1. START THE WHOLE SYSTEM
+============================================================
+
+docker compose down --remove-orphans
+docker compose up -d --build
+docker ps
+
+Expected important containers:
+- kopilkin-nginx-balancer
+- kopilkin-api-gateway-1
+- kopilkin-api-gateway-2
+- kopilkin-auth-service
+- kopilkin-transaction-service
+- kopilkin-savings-service
+- kopilkin-agent-service
+- kopilkin-recsys-service
+- kopilkin-postgres
+- kopilkin-redis
+- kopilkin-kafka
+- kopilkin-kafka-ui
+- kopilkin-qdrant
+- kopilkin-langfuse
+- kopilkin-langfuse-db
+
+
+============================================================
+2. START FRONTEND
+============================================================
+
+Open a separate terminal:
+
+cd frontend
+python3 -m http.server 5500
+
+Open:
+http://127.0.0.1:5500/login.html
+
+
+============================================================
+3. CHECK ROUTING LAYER: NGINX BALANCER + API GATEWAY
+============================================================
+
+Run several times:
+
+curl http://127.0.0.1:8088/health
+curl http://127.0.0.1:8088/health
+curl http://127.0.0.1:8088/health
+curl http://127.0.0.1:8088/health
+
+Expected:
+Sometimes response contains:
+"instance":"api-gateway-1"
+
+Sometimes:
+"instance":"api-gateway-2"
+
+This demonstrates that Nginx load balancer distributes traffic between two API Gateway instances.
+
+
+============================================================
+4. CHECK AUTH SERVICE THROUGH BALANCER
+============================================================
+
+Get user profile:
+
+curl http://127.0.0.1:8088/auth/users/e38fa670-175d-420e-b5c8-5e6de85cee17
+
+Register a new test user to create user.registered Kafka event:
+
+curl -X POST http://127.0.0.1:8088/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"demo_user_1@test.com","password":"123456","name":"Demo User"}'
+
+Login:
+
+curl -X POST http://127.0.0.1:8088/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"123456"}'
+
+
+============================================================
+5. CHECK POSTGRESQL DATABASES
+============================================================
+
+List databases:
+
+docker exec -it kopilkin-postgres psql -U kopilkin -d kopilkin_main -c "\l"
+
+Check users:
+
+docker exec -it kopilkin-postgres psql -U kopilkin -d auth_db -c "SELECT id, email, name, created_at FROM users LIMIT 10;"
+
+Check transactions:
+
+docker exec -it kopilkin-postgres psql -U kopilkin -d transaction_db -c "SELECT id, user_id, amount, category, type, date FROM transactions ORDER BY created_at DESC LIMIT 10;"
+
+Check savings goals:
+
+docker exec -it kopilkin-postgres psql -U kopilkin -d savings_db -c "SELECT id, user_id, title, target_amount, current_amount FROM savings_goals ORDER BY created_at DESC LIMIT 10;"
+
+
+============================================================
+6. CREATE TRANSACTIONS AND GENERATE KAFKA EVENTS
+============================================================
+
+Create expense:
+
+curl -X POST http://127.0.0.1:8088/transactions \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"e38fa670-175d-420e-b5c8-5e6de85cee17","amount":2500,"category":"Restaurants","type":"expense","description":"Demo dinner","date":"2026-05-22"}'
+
+Create income:
+
+curl -X POST http://127.0.0.1:8088/transactions \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"e38fa670-175d-420e-b5c8-5e6de85cee17","amount":12000,"category":"Freelance","type":"income","description":"Demo freelance income","date":"2026-05-22"}'
+
+List transactions:
+
+curl http://127.0.0.1:8088/transactions/e38fa670-175d-420e-b5c8-5e6de85cee17
+
+Get summary:
+
+curl http://127.0.0.1:8088/transactions/e38fa670-175d-420e-b5c8-5e6de85cee17/summary
+
+
+============================================================
+7. REDIS CACHE DEMO: TRANSACTION SUMMARY
+============================================================
+
+First call - should be cache miss + cache set:
+
+curl http://127.0.0.1:8088/transactions/e38fa670-175d-420e-b5c8-5e6de85cee17/summary
+docker logs kopilkin-transaction-service --tail=50
+
+Expected log:
+[Redis] Cache miss: summary:e38fa670-175d-420e-b5c8-5e6de85cee17
+[Redis] Cache set: summary:e38fa670-175d-420e-b5c8-5e6de85cee17
+
+Second call - should be cache hit:
+
+curl http://127.0.0.1:8088/transactions/e38fa670-175d-420e-b5c8-5e6de85cee17/summary
+docker logs kopilkin-transaction-service --tail=50
+
+Expected log:
+[Redis] Cache hit: summary:e38fa670-175d-420e-b5c8-5e6de85cee17
+
+Create a new transaction to invalidate cache:
+
+curl -X POST http://127.0.0.1:8088/transactions \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"e38fa670-175d-420e-b5c8-5e6de85cee17","amount":700,"category":"Transport","type":"expense","description":"Cache invalidation demo","date":"2026-05-22"}'
+
+Check logs:
+
+docker logs kopilkin-transaction-service --tail=50
+
+Expected log:
+[Redis] Cache deleted: summary:e38fa670-175d-420e-b5c8-5e6de85cee17
+
+
+============================================================
+8. REDIS CACHE DEMO: USER PROFILE
+============================================================
+
+First call - cache miss + set:
+
+curl http://127.0.0.1:8088/auth/users/e38fa670-175d-420e-b5c8-5e6de85cee17
+docker logs kopilkin-auth-service --tail=50
+
+Second call - cache hit:
+
+curl http://127.0.0.1:8088/auth/users/e38fa670-175d-420e-b5c8-5e6de85cee17
+docker logs kopilkin-auth-service --tail=50
+
+Check Redis keys directly:
+
+docker exec -it kopilkin-redis redis-cli KEYS "*"
+
+Check specific user cache:
+
+docker exec -it kopilkin-redis redis-cli GET user:e38fa670-175d-420e-b5c8-5e6de85cee17
+
+Check specific summary cache:
+
+docker exec -it kopilkin-redis redis-cli GET summary:e38fa670-175d-420e-b5c8-5e6de85cee17
+
+
+============================================================
+9. REDIS RATE LIMITING DEMO
+============================================================
+
+Normal health check:
+
+curl http://127.0.0.1:8088/health
+
+To demonstrate rate limiting clearly:
+1. Temporarily set RATE_LIMIT_PER_MINUTE to "5" in docker-compose.yml for api-gateway-1 and api-gateway-2.
+2. Restart gateways and balancer:
+
+docker compose up -d --build api-gateway-1 api-gateway-2 nginx-balancer
+
+3. Run several requests quickly:
+
+for i in {1..10}; do curl -s http://127.0.0.1:8088/health; echo; done
+
+Expected after limit is exceeded:
+{"detail":"Rate limit exceeded. Please try again later.","limit_per_minute":5}
+
+After demo, set RATE_LIMIT_PER_MINUTE back to "60" and restart:
+
+docker compose up -d --build api-gateway-1 api-gateway-2 nginx-balancer
+
+
+============================================================
+10. KAFKA TOPICS DEMO
+============================================================
+
+Open Kafka UI:
+http://127.0.0.1:8080
+
+List topics in terminal:
+
+docker exec -it kopilkin-kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server kafka:9092 \
+  --list
+
+Expected topics:
+- user.registered
+- transaction.created
+- transaction.deleted
+- goal.created
+- goal.updated
+- recommendation.requested
+- recommendation.generated
+- agent.chat.completed
+
+Create missing topics if needed:
+
+docker exec -it kopilkin-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic user.registered --partitions 1 --replication-factor 1
+docker exec -it kopilkin-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.created --partitions 1 --replication-factor 1
+docker exec -it kopilkin-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.deleted --partitions 1 --replication-factor 1
+docker exec -it kopilkin-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic goal.created --partitions 1 --replication-factor 1
+docker exec -it kopilkin-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic goal.updated --partitions 1 --replication-factor 1
+docker exec -it kopilkin-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic recommendation.requested --partitions 1 --replication-factor 1
+docker exec -it kopilkin-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic recommendation.generated --partitions 1 --replication-factor 1
+docker exec -it kopilkin-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic agent.chat.completed --partitions 1 --replication-factor 1
+
+Show messages:
+Open Kafka UI -> Topics -> select topic -> Messages.
+
+
+============================================================
+11. SAVINGS SERVICE DEMO
+============================================================
+
+Create savings goal:
+
+curl -X POST http://127.0.0.1:8088/goals \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"e38fa670-175d-420e-b5c8-5e6de85cee17","title":"Demo Vacation Fund","target_amount":50000}'
+
+List goals:
+
+curl http://127.0.0.1:8088/goals/e38fa670-175d-420e-b5c8-5e6de85cee17
+
+After creating a goal, check Kafka UI topic:
+goal.created
+
+To update goal:
+1. Copy goal_id from previous response.
+2. Replace GOAL_ID_HERE:
+
+curl -X PATCH http://127.0.0.1:8088/goals/GOAL_ID_HERE/add \
+  -H "Content-Type: application/json" \
+  -d '{"amount":5000}'
+
+After updating a goal, check Kafka UI topic:
+goal.updated
+
+
+============================================================
+12. RECSYS DEMO
+============================================================
+
+Call recommendations through Nginx balancer:
+
+curl http://127.0.0.1:8088/recommendations/e38fa670-175d-420e-b5c8-5e6de85cee17
+
+Call recommendations directly:
+
+curl http://127.0.0.1:8005/recommendations/e38fa670-175d-420e-b5c8-5e6de85cee17
+
+Expected recommendation types:
+- Heuristic: Save 10% of income
+- Content-based: biggest spending category
+- Educational collaborative filtering: similar synthetic user profile
+
+Check Kafka UI:
+- recommendation.requested
+- recommendation.generated
+
+
+============================================================
+13. AI AGENT DEMO
+============================================================
+
+Make sure Ollama app is running on Mac.
+
+Check Ollama:
+
+curl http://localhost:11434/api/tags
+
+Ask AI through balancer:
+
+curl -X POST http://127.0.0.1:8088/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"e38fa670-175d-420e-b5c8-5e6de85cee17","message":"Analyze my spending and give me one saving advice."}'
+
+Open frontend AI page:
+http://127.0.0.1:5500/ai.html
+
+Open Langfuse UI:
+http://127.0.0.1:3000
+
+
+============================================================
+14. QDRANT CHECK
+============================================================
+
+Open:
+http://127.0.0.1:6333/dashboard
+
+Or check API:
+
+curl http://127.0.0.1:6333/collections
+
+
+============================================================
+15. FULL FRONTEND DEMO FLOW
+============================================================
+
+1. Start backend:
+docker compose up -d --build
+
+2. Start frontend:
+cd frontend
+python3 -m http.server 5500
+
+3. Open:
+http://127.0.0.1:5500/login.html
+
+4. Login using existing user:
+email: test@test.com
+password: 123456
+
+5. Show:
+- Home page summary
+- Quick add transaction
+- Smart recommendations
+- Recent transactions
+
+6. Add a transaction from UI.
+7. Open Kafka UI and show transaction.created.
+8. Open Redis logs and show cache invalidation:
+docker logs kopilkin-transaction-service --tail=50
+
+9. Open Goals page:
+http://127.0.0.1:5500/goals.html
+
+10. Create/update savings goal.
+11. Open Kafka UI and show goal.created / goal.updated.
+
+12. Open AI page:
+http://127.0.0.1:5500/ai.html
+
+13. Ask AI question.
+
+14. Open Profile page:
+http://127.0.0.1:5500/profile.html
+
+
+============================================================
+16. USEFUL LOG COMMANDS
+============================================================
+
+docker logs kopilkin-nginx-balancer --tail=100
+docker logs kopilkin-api-gateway-1 --tail=100
+docker logs kopilkin-api-gateway-2 --tail=100
+docker logs kopilkin-auth-service --tail=100
+docker logs kopilkin-transaction-service --tail=100
+docker logs kopilkin-savings-service --tail=100
+docker logs kopilkin-agent-service --tail=100
+docker logs kopilkin-recsys-service --tail=100
+docker logs kopilkin-kafka --tail=100
+docker logs kopilkin-redis --tail=100
+
+
+============================================================
+17. SHORT DEFENSE SCRIPT
+============================================================
+
+What we implemented:
+
+1. PostgreSQL persistence:
+   auth-service owns auth_db.
+   transaction-service owns transaction_db.
+   savings-service owns savings_db.
+
+2. Kafka / EDA:
+   Services publish domain events after business operations:
+   user.registered, transaction.created, transaction.deleted,
+   goal.created, goal.updated, recommendation.requested, recommendation.generated.
+
+3. Redis:
+   Redis is used for transaction summary cache, user profile cache, and rate limiting counters.
+
+4. Routing layer:
+   Frontend sends API requests to Nginx on port 8088.
+   Nginx balances traffic between api-gateway-1 and api-gateway-2.
+   API Gateway routes requests to internal services and applies Redis-based rate limiting.
+
+5. RecSys:
+   recsys-service generates smart recommendations using:
+   heuristic rules,
+   content-based recommendation,
+   educational collaborative filtering with synthetic user profiles.
+
+6. AI:
+   agent-service uses local Ollama, Qdrant vector memory and Langfuse tracing.
+
+7. Infrastructure:
+   Full local infrastructure runs through Docker Compose.
+   Kubernetes/Talos/Cilium/ArgoCD/Helm are described as future production direction in the report.
