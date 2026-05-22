@@ -1,7 +1,7 @@
-const AUTH_API = "http://127.0.0.1:8001";
-const TRANSACTION_API = "http://127.0.0.1:8002";
-const SAVINGS_API = "http://127.0.0.1:8003";
-const AGENT_API = "http://127.0.0.1:8004";
+const AUTH_API = "http://127.0.0.1:8088/auth";
+const TRANSACTION_API = "http://127.0.0.1:8088";
+const SAVINGS_API = "http://127.0.0.1:8088";
+const AGENT_API = "http://127.0.0.1:8088/agent";
 
 const EXPENSE_CATEGORIES = [
   "Restaurants",

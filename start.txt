@@ -48,7 +48,7 @@ REDIS:
    purpose: request rate limiting
    ttl: 60 seconds
 
-
+------------
 curl http://127.0.0.1:8002/transactions/e38fa670-175d-420e-b5c8-5e6de85cee17/summary
 docker logs kopilkin-transaction-service --tail=50
 x2
@@ -58,3 +58,29 @@ cache hit
 curl http://127.0.0.1:8001/users/e38fa670-175d-420e-b5c8-5e6de85cee17
 docker logs kopilkin-auth-service --tail=50
 x2
+------------
+
+curl http://127.0.0.1:8000/health
+
+
+docker compose up -d --build api-gateway
+
+------------
+Frontend :5500
+   ↓
+Nginx Load Balancer :8088
+   ↓
+api-gateway-1 :8000
+api-gateway-2 :8000
+   ↓
+auth / transaction / savings / agent
+
+-------------
+
+frontend :5500
+   ↓
+nginx-balancer :8088
+   ↓
+api-gateway-1 / api-gateway-2
+   ↓
+microservices
