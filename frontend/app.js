@@ -2,6 +2,7 @@ const AUTH_API = "http://127.0.0.1:8088/auth";
 const TRANSACTION_API = "http://127.0.0.1:8088";
 const SAVINGS_API = "http://127.0.0.1:8088";
 const AGENT_API = "http://127.0.0.1:8088/agent";
+const RECSYS_API = "http://127.0.0.1:8088";
 
 const EXPENSE_CATEGORIES = [
   "Restaurants",
@@ -50,7 +51,7 @@ function redirectToLoginIfNeeded() {
 }
 
 function formatMoney(value) {
-  return `${Number(value).toLocaleString("ru-RU")} ₽`;
+  return `${Number(value || 0).toLocaleString("ru-RU")} ₽`;
 }
 
 function formatDate(dateStr) {
@@ -174,10 +175,13 @@ function setupHomePage() {
   setupTypeChips();
   renderCategoryChips("expense");
   setTodayDate();
+
   loadTransactionsAndSummary(user.user_id);
+  loadRecommendations(user.user_id);
 
   const transactionForm = document.getElementById("transactionForm");
   const refreshBtn = document.getElementById("refreshTransactionsBtn");
+  const refreshRecommendationsBtn = document.getElementById("refreshRecommendationsBtn");
   const transactionMessage = document.getElementById("transactionMessage");
 
   if (transactionForm) {
@@ -217,7 +221,9 @@ function setupHomePage() {
         transactionForm.reset();
         setTodayDate();
         renderCategoryChips(type);
+
         loadTransactionsAndSummary(user.user_id);
+        loadRecommendations(user.user_id);
       } catch (error) {
         transactionMessage.textContent = error.message;
       }
@@ -226,6 +232,10 @@ function setupHomePage() {
 
   refreshBtn?.addEventListener("click", () => {
     loadTransactionsAndSummary(user.user_id);
+  });
+
+  refreshRecommendationsBtn?.addEventListener("click", () => {
+    loadRecommendations(user.user_id);
   });
 }
 
@@ -582,9 +592,75 @@ async function deleteTransaction(transactionId) {
     });
 
     loadTransactionsAndSummary(user.user_id);
+    loadRecommendations(user.user_id);
   } catch (error) {
     alert(error.message);
   }
+}
+
+async function loadRecommendations(userId) {
+  const container = document.getElementById("recommendationsList");
+  if (!container) return;
+
+  container.innerHTML = `<p class="muted-text">Loading recommendations...</p>`;
+
+  try {
+    const result = await apiRequest(`${RECSYS_API}/recommendations/${userId}`);
+    renderRecommendations(result.recommendations || []);
+  } catch (error) {
+    container.innerHTML = `<p class="muted-text">Could not load recommendations: ${error.message}</p>`;
+  }
+}
+
+function renderRecommendations(recommendations) {
+  const container = document.getElementById("recommendationsList");
+  if (!container) return;
+
+  if (!recommendations.length) {
+    container.innerHTML = `<p class="muted-text">No recommendations yet.</p>`;
+    return;
+  }
+
+  container.innerHTML = recommendations
+    .map((recommendation) => `
+      <div class="recommendation-card">
+        <div class="recommendation-top">
+          <div>
+            <div class="recommendation-title">${recommendation.title}</div>
+            <div class="small-label">${formatRecommendationType(recommendation.type)}</div>
+          </div>
+          <span class="recommendation-badge">${formatApproachName(recommendation.approach)}</span>
+        </div>
+        <p class="recommendation-description">${recommendation.description}</p>
+      </div>
+    `)
+    .join("");
+}
+
+function formatApproachName(approach) {
+  if (!approach) return "RecSys";
+
+  const names = {
+    heuristic: "Heuristic",
+    content_based: "Content-based",
+    collaborative_filtering: "Collaborative"
+  };
+
+  return names[approach] || approach;
+}
+
+function formatRecommendationType(type) {
+  if (!type) return "Personal recommendation";
+
+  const names = {
+    cold_start: "Cold start",
+    saving_rule: "Saving rule",
+    overspending_alert: "Overspending alert",
+    category_based: "Category-based advice",
+    similar_users: "Similar users"
+  };
+
+  return names[type] || type.replaceAll("_", " ");
 }
 
 async function loadGoals(userId) {

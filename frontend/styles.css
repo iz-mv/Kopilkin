@@ -631,3 +631,47 @@ select {
     max-height: 390px;
   }
 }
+
+
+.recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.recommendation-card {
+  background: #f7faff;
+  border-radius: 22px;
+  padding: 18px;
+}
+
+.recommendation-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.recommendation-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.recommendation-description {
+  font-size: 15px;
+  line-height: 1.4;
+  color: #64748b;
+  margin: 0;
+}
+
+.recommendation-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}

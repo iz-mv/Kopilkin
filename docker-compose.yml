@@ -190,6 +190,23 @@ services:
       retries: 5
     restart: unless-stopped
 
+  recsys-service:
+    build:
+      context: ./recsys-service
+      dockerfile: Dockerfile
+    container_name: kopilkin-recsys-service
+    ports:
+      - "8005:8005"
+    environment:
+      TRANSACTION_SERVICE_URL: "http://transaction-service:8002"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+    depends_on:
+      transaction-service:
+        condition: service_started
+      kafka:
+        condition: service_started
+    restart: unless-stopped
+
   api-gateway-1:
     build:
       context: ./api-gateway
@@ -204,6 +221,7 @@ services:
       TRANSACTION_SERVICE_URL: "http://transaction-service:8002"
       SAVINGS_SERVICE_URL: "http://savings-service:8003"
       AGENT_SERVICE_URL: "http://agent-service:8004"
+      RECSYS_SERVICE_URL: "http://recsys-service:8005"
       REDIS_URL: "redis://redis:6379/0"
       RATE_LIMIT_PER_MINUTE: "60"
     depends_on:
@@ -212,6 +230,8 @@ services:
       transaction-service:
         condition: service_started
       savings-service:
+        condition: service_started
+      recsys-service:
         condition: service_started
       redis:
         condition: service_started
@@ -231,6 +251,7 @@ services:
       TRANSACTION_SERVICE_URL: "http://transaction-service:8002"
       SAVINGS_SERVICE_URL: "http://savings-service:8003"
       AGENT_SERVICE_URL: "http://agent-service:8004"
+      RECSYS_SERVICE_URL: "http://recsys-service:8005"
       REDIS_URL: "redis://redis:6379/0"
       RATE_LIMIT_PER_MINUTE: "60"
     depends_on:
@@ -239,6 +260,8 @@ services:
       transaction-service:
         condition: service_started
       savings-service:
+        condition: service_started
+      recsys-service:
         condition: service_started
       redis:
         condition: service_started

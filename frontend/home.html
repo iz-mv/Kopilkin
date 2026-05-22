@@ -21,10 +21,12 @@
         <div class="small-label">Today spent</div>
         <div class="big-number" id="todaySpent">0 ₽</div>
       </div>
+
       <div class="card summary-card">
         <div class="small-label">Total income</div>
         <div class="big-number" id="totalIncome">0 ₽</div>
       </div>
+
       <div class="card summary-card full-width">
         <div class="small-label">Suggested to save today</div>
         <div class="big-number accent-number" id="suggestedSave">0 ₽</div>
@@ -60,6 +62,20 @@
       </form>
 
       <p id="transactionMessage" class="message-text"></p>
+    </section>
+
+    <section class="card">
+      <div class="section-row">
+        <div>
+          <div class="small-label">Personalized finance tips</div>
+          <h2 class="section-title">Smart recommendations</h2>
+        </div>
+        <button id="refreshRecommendationsBtn" class="text-btn">Refresh</button>
+      </div>
+
+      <div id="recommendationsList" class="recommendations-list">
+        <p class="muted-text">Loading recommendations...</p>
+      </div>
     </section>
 
     <section class="card">

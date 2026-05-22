@@ -13,6 +13,7 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8001")
 TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://localhost:8002")
 SAVINGS_SERVICE_URL = os.getenv("SAVINGS_SERVICE_URL", "http://localhost:8003")
 AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://localhost:8004")
+RECSYS_SERVICE_URL = os.getenv("RECSYS_SERVICE_URL", "http://localhost:8005")
 INSTANCE_NAME = os.getenv("INSTANCE_NAME", "api-gateway")
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -185,4 +186,13 @@ async def agent_proxy(path: str, request: Request):
         request=request,
         target_base_url=AGENT_SERVICE_URL,
         path=path,
+    )
+
+
+@app.api_route("/recommendations/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def recsys_proxy(path: str, request: Request):
+    return await proxy_request(
+        request=request,
+        target_base_url=RECSYS_SERVICE_URL,
+        path=f"recommendations/{path}",
     )

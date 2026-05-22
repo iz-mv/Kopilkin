@@ -1,0 +1,54 @@
+1. Heuristic recommendations
+
+Это простые правила.
+
+Например:
+
+если есть доход → предложить откладывать 10%
+если расходы больше доходов → предупредить о перерасходе
+если нет транзакций → cold start совет
+
+Пример:
+
+Based on your income, try saving around 10% this month.
+
+Это не ML, но это хороший baseline.
+
+2. Content-based recommendations
+
+Сервис смотрит, на что именно пользователь тратит больше всего.
+
+Например, если больше всего расходов в категории:
+
+Restaurants
+
+то рекомендация будет:
+
+You spend the most on Restaurants. Try cooking at home a few days per week.
+
+То есть рекомендация строится на контенте самого пользователя: его категориях, суммах, привычках.
+
+3. Collaborative filtering
+
+Тут мы сравниваем пользователя с похожими профилями.
+
+Например, у пользователя расходы:
+
+Shopping 50%
+Restaurants 20%
+Entertainment 20%
+Groceries 10%
+
+Сервис сравнивает это с заранее созданными synthetic user profiles:
+
+student_saver
+traveler
+shopper
+home_budget_user
+
+И выбирает самый похожий профиль через cosine similarity.
+
+Пример:
+
+This user is similar to shopper profile.
+Users with similar shopping behavior often reduce spending by setting category limits.
