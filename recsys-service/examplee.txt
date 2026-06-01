@@ -12,7 +12,6 @@
 
 Based on your income, try saving around 10% this month.
 
-Это не ML, но это хороший baseline.
 
 2. Content-based recommendations
 

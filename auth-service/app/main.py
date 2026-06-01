@@ -1,13 +1,34 @@
-from fastapi import FastAPI, HTTPException, Depends
+from datetime import datetime, timezone
+import uuid
+
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-import uuid
 
 from app.database import Base, engine, get_db
 from app.models import User
-from app.schemas import RegisterRequest, LoginRequest, UserResponse, UserUpdateRequest
+from app.schemas import (
+    RegisterRequest,
+    LoginRequest,
+    LoginResponse,
+    LogoutRequest,
+    UserResponse,
+    UserUpdateRequest,
+)
 from app.events import publish_event
-from app.cache import get_cache, set_cache, delete_cache
+from app.cache import (
+    get_cache,
+    set_cache,
+    delete_cache,
+    blacklist_token,
+    is_token_blacklisted,
+)
+from app.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    decode_access_token,
+)
 
 
 app = FastAPI(title="Kopilkin Auth Service")
@@ -21,6 +42,36 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+
+
+def get_current_user(
+    authorization: str = Header(default=""),
+    db: Session = Depends(get_db),
+) -> User:
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Bearer token")
+
+    token = authorization.replace("Bearer ", "").strip()
+    payload = decode_access_token(token)
+
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    jti = payload.get("jti")
+    user_id = payload.get("sub")
+
+    if not jti or not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    if is_token_blacklisted(jti):
+        raise HTTPException(status_code=401, detail="Token has been logged out")
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return user
 
 
 @app.get("/")
@@ -38,7 +89,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     user = User(
         id=str(uuid.uuid4()),
         email=data.email,
-        password=data.password,
+        password_hash=hash_password(data.password),
         name=data.name,
     )
 
@@ -60,19 +111,51 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     return user
 
 
-@app.post("/login")
+@app.post("/login", response_model=LoginResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
 
-    if user and user.password == data.password:
-        return {
-            "message": "Login successful",
-            "access_token": f"fake-token-{user.id}",
-            "user_id": user.id,
-            "name": user.name,
-        }
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not verify_password(data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    access_token = create_access_token(user.id)
+
+    return {
+        "message": "Login successful",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": user.id,
+        "name": user.name,
+    }
+
+
+@app.post("/logout")
+def logout(data: LogoutRequest):
+    payload = decode_access_token(data.access_token)
+
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    jti = payload.get("jti")
+    exp = payload.get("exp")
+
+    if not jti or not exp:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    now = int(datetime.now(timezone.utc).timestamp())
+    ttl_seconds = max(exp - now, 1)
+
+    blacklist_token(jti=jti, ttl_seconds=ttl_seconds)
+
+    return {"message": "Logged out successfully"}
+
+
+@app.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 
 @app.get("/users/{user_id}", response_model=UserResponse)

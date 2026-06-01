@@ -35,6 +35,9 @@ services:
       AUTH_DATABASE_URL: "postgresql://kopilkin:kopilkin_password@postgres:5432/auth_db"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       REDIS_URL: "redis://redis:6379/0"
+      JWT_SECRET_KEY: "kopilkin-local-dev-secret-change-me"
+      JWT_ALGORITHM: "HS256"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
     depends_on:
       postgres:
         condition: service_healthy
