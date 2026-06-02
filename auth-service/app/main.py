@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import uuid
 
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,8 @@ from app.security import (
     create_access_token,
     decode_access_token,
 )
+
+from app.storage import upload_image_to_minio, delete_file_from_minio
 
 
 app = FastAPI(title="Kopilkin Auth Service")
@@ -158,6 +160,32 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+@app.post("/me/avatar", response_model=UserResponse)
+def upload_my_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    old_avatar_url = current_user.avatar_url
+
+    avatar_url = upload_image_to_minio(
+        file=file,
+        folder=f"avatars/{current_user.id}"
+    )
+
+    current_user.avatar_url = avatar_url
+
+    db.commit()
+    db.refresh(current_user)
+
+    delete_cache(f"user:{current_user.id}")
+
+    if old_avatar_url:
+        delete_file_from_minio(old_avatar_url)
+
+    return current_user
+
+
 @app.get("/users/{user_id}", response_model=UserResponse)
 def get_user(user_id: str, db: Session = Depends(get_db)):
     cache_key = f"user:{user_id}"
@@ -175,6 +203,7 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
         "id": user.id,
         "email": user.email,
         "name": user.name,
+        "avatar_url": user.avatar_url,
     }
 
     set_cache(cache_key, user_data, ttl_seconds=300)

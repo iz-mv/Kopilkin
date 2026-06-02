@@ -41,6 +41,22 @@ function clearCurrentUser() {
   localStorage.removeItem("kopilkin_user");
 }
 
+function applyAvatar(element, userOrProfile, fallbackText = "U") {
+  if (!element) return;
+
+  const avatarUrl = userOrProfile?.avatar_url;
+
+  if (avatarUrl) {
+    element.textContent = "";
+    element.classList.add("has-image");
+    element.style.backgroundImage = `url("${avatarUrl}")`;
+  } else {
+    element.classList.remove("has-image");
+    element.style.backgroundImage = "";
+    element.textContent = fallbackText;
+  }
+}
+
 function redirectToLoginIfNeeded() {
   const user = getCurrentUser();
   if (!user) {
@@ -64,9 +80,11 @@ function formatDate(dateStr) {
 }
 
 async function apiRequest(url, options = {}) {
+  const isFormData = options.body instanceof FormData;
+
   const response = await fetch(url, {
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(options.headers || {}),
     },
     ...options,
@@ -144,6 +162,7 @@ function setupAuthPage() {
         user_id: result.user_id,
         name: result.name,
         access_token: result.access_token,
+        avatar_url: result.avatar_url || null,
       });
 
       window.location.href = "home.html";
@@ -167,9 +186,8 @@ function setupHomePage() {
   if (!user) return;
 
   const avatar = document.querySelector(".avatar-circle");
-  if (avatar && user.name) {
-    avatar.textContent = user.name[0].toUpperCase();
-  }
+  const fallbackLetter = user.name?.[0]?.toUpperCase() || "U";
+  applyAvatar(avatar, user, fallbackLetter);
 
   setupLogoutButtons();
   setupTypeChips();
@@ -244,9 +262,8 @@ function setupGoalsPage() {
   if (!user) return;
 
   const avatar = document.querySelector(".avatar-circle");
-  if (avatar && user.name) {
-    avatar.textContent = user.name[0].toUpperCase();
-  }
+  const fallbackLetter = user.name?.[0]?.toUpperCase() || "U";
+  applyAvatar(avatar, user, fallbackLetter);
 
   setupLogoutButtons();
   loadGoals(user.user_id);
@@ -303,6 +320,8 @@ function setupProfilePage() {
   setupLogoutButtons();
 
   const avatar = document.getElementById("profileAvatar");
+  const largeAvatar = document.getElementById("profileAvatarLarge");
+
   const nameText = document.getElementById("profileNameText");
   const emailText = document.getElementById("profileEmailText");
   const nameInput = document.getElementById("profileNameInput");
@@ -312,15 +331,38 @@ function setupProfilePage() {
   const profileMessage = document.getElementById("profileMessage");
   const profileForm = document.getElementById("profileForm");
 
+  const chooseAvatarBtn = document.getElementById("chooseAvatarBtn");
+  const avatarFileInput = document.getElementById("avatarFileInput");
+  const avatarCropper = document.getElementById("avatarCropper");
+  const avatarCropImage = document.getElementById("avatarCropImage");
+  const avatarZoomRange = document.getElementById("avatarZoomRange");
+  const avatarXRange = document.getElementById("avatarXRange");
+  const avatarYRange = document.getElementById("avatarYRange");
+  const uploadAvatarBtn = document.getElementById("uploadAvatarBtn");
+
+  let selectedAvatarFile = null;
+  let selectedAvatarPreviewUrl = null;
+
   apiRequest(`${AUTH_API}/users/${user.user_id}`)
     .then((profile) => {
-      if (avatar) avatar.textContent = profile.name[0].toUpperCase();
+      const fallbackLetter = profile.name?.[0]?.toUpperCase() || "U";
+
+      applyAvatar(avatar, profile, fallbackLetter);
+      applyAvatar(largeAvatar, profile, "🐷");
+
       if (nameText) nameText.textContent = profile.name;
       if (emailText) emailText.textContent = profile.email;
       if (nameInput) nameInput.value = profile.name;
       if (emailInput) emailInput.value = profile.email;
       if (userIdText) userIdText.textContent = user.user_id;
       if (tokenText) tokenText.textContent = user.access_token || "-";
+
+      setCurrentUser({
+        ...user,
+        name: profile.name,
+        email: profile.email,
+        avatar_url: profile.avatar_url,
+      });
     })
     .catch((error) => {
       if (profileMessage) profileMessage.textContent = error.message;
@@ -338,12 +380,19 @@ function setupProfilePage() {
           body: JSON.stringify({ name: newName }),
         });
 
-        setCurrentUser({
-          ...user,
+        const updatedUser = {
+          ...getCurrentUser(),
           name: updated.name,
-        });
+          avatar_url: updated.avatar_url,
+        };
 
-        if (avatar) avatar.textContent = updated.name[0].toUpperCase();
+        setCurrentUser(updatedUser);
+
+        const fallbackLetter = updated.name?.[0]?.toUpperCase() || "U";
+
+        applyAvatar(avatar, updated, fallbackLetter);
+        applyAvatar(largeAvatar, updated, "🐷");
+
         if (nameText) nameText.textContent = updated.name;
 
         profileMessage.textContent = "Profile updated successfully";
@@ -352,6 +401,159 @@ function setupProfilePage() {
       }
     });
   }
+
+  function updateCropPreview() {
+    if (!avatarCropImage) return;
+
+    const zoom = Number(avatarZoomRange?.value || 1);
+    const x = Number(avatarXRange?.value || 0);
+    const y = Number(avatarYRange?.value || 0);
+
+    avatarCropImage.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+  }
+
+  function createCroppedAvatarBlob() {
+    return new Promise((resolve, reject) => {
+      if (!selectedAvatarFile) {
+        reject(new Error("No image selected"));
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      const size = 512;
+
+      canvas.width = size;
+      canvas.height = size;
+
+      const ctx = canvas.getContext("2d");
+      const image = new Image();
+
+      image.onload = () => {
+        const zoom = Number(avatarZoomRange?.value || 1);
+        const x = Number(avatarXRange?.value || 0);
+        const y = Number(avatarYRange?.value || 0);
+
+        const baseScale = Math.max(size / image.width, size / image.height);
+        const scale = baseScale * zoom;
+
+        const drawWidth = image.width * scale;
+        const drawHeight = image.height * scale;
+
+        const drawX = (size - drawWidth) / 2 + x * 2;
+        const drawY = (size - drawHeight) / 2 + y * 2;
+
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Could not crop image"));
+              return;
+            }
+
+            resolve(blob);
+          },
+          "image/jpeg",
+          0.9
+        );
+      };
+
+      image.onerror = () => reject(new Error("Could not load image"));
+      image.src = URL.createObjectURL(selectedAvatarFile);
+    });
+  }
+
+  chooseAvatarBtn?.addEventListener("click", () => {
+    avatarFileInput?.click();
+  });
+
+  avatarFileInput?.addEventListener("change", () => {
+    const file = avatarFileInput.files?.[0];
+
+    if (!file) return;
+
+    selectedAvatarFile = file;
+
+    if (selectedAvatarPreviewUrl) {
+      URL.revokeObjectURL(selectedAvatarPreviewUrl);
+    }
+
+    selectedAvatarPreviewUrl = URL.createObjectURL(file);
+
+    if (avatarCropImage) {
+      avatarCropImage.src = selectedAvatarPreviewUrl;
+    }
+
+    if (avatarCropper) avatarCropper.classList.remove("hidden");
+    if (avatarZoomRange) avatarZoomRange.value = "1";
+    if (avatarXRange) avatarXRange.value = "0";
+    if (avatarYRange) avatarYRange.value = "0";
+
+    updateCropPreview();
+
+    if (profileMessage) {
+      profileMessage.textContent = "Adjust the photo and upload it";
+    }
+  });
+
+  [avatarZoomRange, avatarXRange, avatarYRange].forEach((input) => {
+    input?.addEventListener("input", updateCropPreview);
+  });
+
+  uploadAvatarBtn?.addEventListener("click", async () => {
+    try {
+      if (!selectedAvatarFile) {
+        profileMessage.textContent = "Please choose an image first";
+        return;
+      }
+
+      profileMessage.textContent = "Uploading avatar...";
+
+      const croppedBlob = await createCroppedAvatarBlob();
+
+      const formData = new FormData();
+      formData.append("file", croppedBlob, "avatar.jpg");
+
+      const currentUser = getCurrentUser();
+
+      const updated = await apiRequest(`${AUTH_API}/me/avatar`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${currentUser.access_token}`,
+        },
+        body: formData,
+      });
+
+      const updatedUser = {
+        ...currentUser,
+        name: updated.name,
+        email: updated.email,
+        avatar_url: updated.avatar_url,
+      };
+
+      setCurrentUser(updatedUser);
+
+      const fallbackLetter = updated.name?.[0]?.toUpperCase() || "U";
+
+      applyAvatar(avatar, updated, fallbackLetter);
+      applyAvatar(largeAvatar, updated, "🐷");
+
+      if (avatarCropper) avatarCropper.classList.add("hidden");
+      if (avatarFileInput) avatarFileInput.value = "";
+
+      selectedAvatarFile = null;
+
+      if (selectedAvatarPreviewUrl) {
+        URL.revokeObjectURL(selectedAvatarPreviewUrl);
+        selectedAvatarPreviewUrl = null;
+      }
+
+      profileMessage.textContent = "Avatar updated successfully";
+    } catch (error) {
+      profileMessage.textContent = error.message;
+    }
+  });
 }
 
 function setupAIPage() {
@@ -361,9 +563,8 @@ function setupAIPage() {
   setupLogoutButtons();
 
   const avatar = document.querySelector(".avatar-circle");
-  if (avatar && user.name) {
-    avatar.textContent = user.name[0].toUpperCase();
-  }
+  const fallbackLetter = user.name?.[0]?.toUpperCase() || "U";
+  applyAvatar(avatar, user, fallbackLetter);
 
   const form = document.getElementById("aiChatForm");
   const input = document.getElementById("aiChatInput");
@@ -432,10 +633,26 @@ function setupAIPage() {
 
 function setupLogoutButtons() {
   document.querySelectorAll("#logoutBtn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       e.preventDefault();
-      clearCurrentUser();
-      window.location.href = "login.html";
+
+      const user = getCurrentUser();
+
+      try {
+        if (user?.access_token) {
+          await apiRequest(`${AUTH_API}/logout`, {
+            method: "POST",
+            body: JSON.stringify({
+              access_token: user.access_token,
+            }),
+          });
+        }
+      } catch (error) {
+        console.warn("Backend logout failed:", error.message);
+      } finally {
+        clearCurrentUser();
+        window.location.href = "login.html";
+      }
     });
   });
 }
