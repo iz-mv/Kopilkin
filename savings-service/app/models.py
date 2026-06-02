@@ -14,5 +14,6 @@ class SavingsGoal(Base):
     title = Column(String, nullable=False)
     target_amount = Column(Float, nullable=False)
     current_amount = Column(Float, default=0.0)
+    image_url = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)

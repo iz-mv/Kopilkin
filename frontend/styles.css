@@ -845,3 +845,150 @@ select {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+
+
+.goal-card {
+  overflow: hidden;
+}
+
+.goal-image-cover {
+  width: 100%;
+  height: 160px;
+  border-radius: 24px;
+  background: #eef4f8;
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.goal-image-placeholder-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.goal-card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.goal-image-btn {
+  width: auto;
+  min-width: 118px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.goal-image-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.goal-image-modal {
+  width: min(520px, 100%);
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 22px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.25);
+}
+
+.goal-image-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.goal-image-modal-close {
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: #eef4f8;
+  color: #111827;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.goal-image-modal-hint {
+  margin: 8px 0 16px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.goal-image-crop-area {
+  width: min(420px, 100%);
+  aspect-ratio: 16 / 9;
+  margin: 18px auto;
+  border-radius: 24px;
+  background: #eef4f8;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.goal-image-crop-area:active {
+  cursor: grabbing;
+}
+
+.goal-image-crop-area::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  pointer-events: none;
+}
+
+.goal-image-empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-weight: 700;
+  text-align: center;
+  padding: 20px;
+}
+
+#goalImageCropImage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.goal-image-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

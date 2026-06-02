@@ -305,6 +305,7 @@ function setupGoalsPage() {
   refreshTopAvatar(avatar, user);
 
   setupLogoutButtons();
+  setupGoalImageModal(user.user_id);
   loadGoals(user.user_id);
 
   const goalForm = document.getElementById("goalForm");
@@ -1048,6 +1049,316 @@ function formatRecommendationType(type) {
   return names[type] || type.replaceAll("_", " ");
 }
 
+
+let goalImageModalInitialized = false;
+let goalImageCurrentGoalId = null;
+let goalImageSelectedFile = null;
+let goalImageSelectedPreviewUrl = null;
+let goalImageCurrentUserId = null;
+let goalImageElements = null;
+
+const goalImageCropState = {
+  x: 0,
+  y: 0,
+  scale: 1,
+  dragging: false,
+  startPointerX: 0,
+  startPointerY: 0,
+  startImageX: 0,
+  startImageY: 0,
+};
+
+function setupGoalImageModal(userId) {
+  goalImageCurrentUserId = userId;
+
+  if (goalImageModalInitialized) return;
+
+  goalImageElements = {
+    modal: document.getElementById("goalImageModal"),
+    closeBtn: document.getElementById("goalImageModalCloseBtn"),
+    cancelBtn: document.getElementById("goalImageCancelBtn"),
+    chooseBtn: document.getElementById("chooseGoalImageInsideBtn"),
+    fileInput: document.getElementById("goalImageFileInput"),
+    cropArea: document.getElementById("goalImageCropArea"),
+    cropImage: document.getElementById("goalImageCropImage"),
+    emptyState: document.getElementById("goalImageEmptyState"),
+    uploadBtn: document.getElementById("uploadGoalImageBtn"),
+    message: document.getElementById("goalImageModalMessage"),
+  };
+
+  if (!goalImageElements.modal) return;
+
+  goalImageElements.closeBtn?.addEventListener("click", closeGoalImageModal);
+  goalImageElements.cancelBtn?.addEventListener("click", closeGoalImageModal);
+
+  goalImageElements.modal?.addEventListener("click", (event) => {
+    if (event.target === goalImageElements.modal) {
+      closeGoalImageModal();
+    }
+  });
+
+  goalImageElements.chooseBtn?.addEventListener("click", () => {
+    goalImageElements.fileInput?.click();
+  });
+
+  goalImageElements.fileInput?.addEventListener("change", () => {
+    const file = goalImageElements.fileInput.files?.[0];
+
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      if (goalImageElements.message) {
+        goalImageElements.message.textContent = "Only JPG, PNG and WEBP images are allowed";
+      }
+      return;
+    }
+
+    loadGoalImageIntoCropper(file);
+  });
+
+  goalImageElements.cropArea?.addEventListener("pointerdown", (event) => {
+    if (!goalImageSelectedFile) return;
+
+    goalImageCropState.dragging = true;
+    goalImageCropState.startPointerX = event.clientX;
+    goalImageCropState.startPointerY = event.clientY;
+    goalImageCropState.startImageX = goalImageCropState.x;
+    goalImageCropState.startImageY = goalImageCropState.y;
+
+    goalImageElements.cropArea.setPointerCapture(event.pointerId);
+  });
+
+  goalImageElements.cropArea?.addEventListener("pointermove", (event) => {
+    if (!goalImageCropState.dragging) return;
+
+    const deltaX = event.clientX - goalImageCropState.startPointerX;
+    const deltaY = event.clientY - goalImageCropState.startPointerY;
+
+    goalImageCropState.x = goalImageCropState.startImageX + deltaX;
+    goalImageCropState.y = goalImageCropState.startImageY + deltaY;
+
+    updateGoalImageTransform();
+  });
+
+  goalImageElements.cropArea?.addEventListener("pointerup", (event) => {
+    goalImageCropState.dragging = false;
+
+    try {
+      goalImageElements.cropArea.releasePointerCapture(event.pointerId);
+    } catch (_) {}
+  });
+
+  goalImageElements.cropArea?.addEventListener("pointerleave", () => {
+    goalImageCropState.dragging = false;
+  });
+
+  goalImageElements.cropArea?.addEventListener("wheel", (event) => {
+    if (!goalImageSelectedFile) return;
+
+    event.preventDefault();
+
+    const direction = event.deltaY < 0 ? 1 : -1;
+    const nextScale = goalImageCropState.scale + direction * 0.08;
+
+    goalImageCropState.scale = Math.min(Math.max(nextScale, 1), 3);
+
+    updateGoalImageTransform();
+  });
+
+  goalImageElements.uploadBtn?.addEventListener("click", uploadCroppedGoalImage);
+
+  goalImageModalInitialized = true;
+}
+
+function openGoalImageModal(goalId) {
+  goalImageCurrentGoalId = goalId;
+
+  if (!goalImageElements?.modal) {
+    return;
+  }
+
+  resetGoalImageCropper();
+  goalImageElements.modal.classList.remove("hidden");
+
+  if (goalImageElements.message) {
+    goalImageElements.message.textContent = "Choose an image to continue";
+  }
+}
+
+function closeGoalImageModal() {
+  goalImageElements?.modal?.classList.add("hidden");
+  resetGoalImageCropper();
+  goalImageCurrentGoalId = null;
+}
+
+function resetGoalImageCropper() {
+  if (goalImageElements?.message) goalImageElements.message.textContent = "";
+  if (goalImageElements?.fileInput) goalImageElements.fileInput.value = "";
+
+  goalImageSelectedFile = null;
+
+  if (goalImageSelectedPreviewUrl) {
+    URL.revokeObjectURL(goalImageSelectedPreviewUrl);
+    goalImageSelectedPreviewUrl = null;
+  }
+
+  if (goalImageElements?.cropImage) {
+    goalImageElements.cropImage.src = "";
+    goalImageElements.cropImage.classList.add("hidden");
+    goalImageElements.cropImage.style.width = "";
+    goalImageElements.cropImage.style.height = "";
+    goalImageElements.cropImage.style.transform = "";
+  }
+
+  goalImageElements?.emptyState?.classList.remove("hidden");
+
+  goalImageCropState.x = 0;
+  goalImageCropState.y = 0;
+  goalImageCropState.scale = 1;
+  goalImageCropState.dragging = false;
+}
+
+function updateGoalImageTransform() {
+  if (!goalImageElements?.cropImage) return;
+
+  goalImageElements.cropImage.style.transform =
+    `translate(-50%, -50%) translate(${goalImageCropState.x}px, ${goalImageCropState.y}px) scale(${goalImageCropState.scale})`;
+}
+
+function loadGoalImageIntoCropper(file) {
+  goalImageSelectedFile = file;
+
+  if (goalImageSelectedPreviewUrl) {
+    URL.revokeObjectURL(goalImageSelectedPreviewUrl);
+  }
+
+  goalImageSelectedPreviewUrl = URL.createObjectURL(file);
+
+  goalImageCropState.x = 0;
+  goalImageCropState.y = 0;
+  goalImageCropState.scale = 1;
+
+  if (goalImageElements.message) {
+    goalImageElements.message.textContent = "Drag the image to adjust crop. Scroll to zoom.";
+  }
+
+  goalImageElements.emptyState?.classList.add("hidden");
+
+  const cropImage = goalImageElements.cropImage;
+  const cropArea = goalImageElements.cropArea;
+
+  if (!cropImage || !cropArea) return;
+
+  cropImage.onload = () => {
+    const areaRect = cropArea.getBoundingClientRect();
+
+    const baseScale = Math.max(
+      areaRect.width / cropImage.naturalWidth,
+      areaRect.height / cropImage.naturalHeight,
+    );
+
+    cropImage.style.width = `${cropImage.naturalWidth * baseScale}px`;
+    cropImage.style.height = `${cropImage.naturalHeight * baseScale}px`;
+
+    cropImage.classList.remove("hidden");
+    updateGoalImageTransform();
+  };
+
+  cropImage.src = goalImageSelectedPreviewUrl;
+}
+
+function createCroppedGoalImageBlob() {
+  return new Promise((resolve, reject) => {
+    if (!goalImageSelectedFile || !goalImageElements?.cropArea) {
+      reject(new Error("Please choose an image first"));
+      return;
+    }
+
+    const image = new Image();
+
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      const width = 960;
+      const height = 540;
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      const areaRect = goalImageElements.cropArea.getBoundingClientRect();
+
+      const baseScale = Math.max(width / image.width, height / image.height);
+      const scale = baseScale * goalImageCropState.scale;
+
+      const drawWidth = image.width * scale;
+      const drawHeight = image.height * scale;
+
+      const xRatio = width / areaRect.width;
+      const yRatio = height / areaRect.height;
+
+      const drawX = (width - drawWidth) / 2 + goalImageCropState.x * xRatio;
+      const drawY = (height - drawHeight) / 2 + goalImageCropState.y * yRatio;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("Could not crop image"));
+            return;
+          }
+
+          resolve(blob);
+        },
+        "image/jpeg",
+        0.9,
+      );
+    };
+
+    image.onerror = () => reject(new Error("Could not load image"));
+    image.src = URL.createObjectURL(goalImageSelectedFile);
+  });
+}
+
+async function uploadCroppedGoalImage() {
+  try {
+    if (!goalImageCurrentGoalId) {
+      goalImageElements.message.textContent = "Goal is not selected";
+      return;
+    }
+
+    if (!goalImageSelectedFile) {
+      goalImageElements.message.textContent = "Please choose an image first";
+      return;
+    }
+
+    goalImageElements.message.textContent = "Uploading goal image...";
+
+    const croppedBlob = await createCroppedGoalImageBlob();
+
+    const formData = new FormData();
+    formData.append("file", croppedBlob, "goal-cover.jpg");
+
+    await apiRequest(`${SAVINGS_API}/goals/${goalImageCurrentGoalId}/image`, {
+      method: "POST",
+      body: formData,
+    });
+
+    goalImageElements.message.textContent = "Goal image updated successfully";
+
+    if (goalImageCurrentUserId) {
+      loadGoals(goalImageCurrentUserId);
+    }
+
+    setTimeout(() => {
+      closeGoalImageModal();
+    }, 500);
+  } catch (error) {
+    goalImageElements.message.textContent = error.message;
+  }
+}
+
 async function loadGoals(userId) {
   try {
     const goals = await apiRequest(`${SAVINGS_API}/goals/${userId}`);
@@ -1079,20 +1390,45 @@ function renderGoals(goals) {
         : 0;
 
       const safeProgressPercent = Math.min(Math.max(progressPercent, 0), 100);
+      const safeImageUrl = goal.image_url ? String(goal.image_url).replaceAll('"', '&quot;') : "";
 
       return `
         <div class="goal-card">
-          <div class="goal-title">${goal.title}</div>
+          <div
+            class="goal-image-cover ${goal.image_url ? "has-goal-image" : ""}"
+            ${goal.image_url ? `style="background-image: url(&quot;${safeImageUrl}&quot;)"` : ""}
+          >
+            ${goal.image_url ? "" : `<span class="goal-image-placeholder-icon">🎯</span>`}
+          </div>
+
+          <div class="goal-card-header-row">
+            <div>
+              <div class="goal-title">${goal.title}</div>
+              <div class="small-label">Savings target</div>
+            </div>
+
+            <button
+              type="button"
+              class="secondary-btn goal-image-btn"
+              onclick="openGoalImageModal('${goal.id}')"
+            >
+              ${goal.image_url ? "Change image" : "Add image"}
+            </button>
+          </div>
+
           <div class="goal-meta">
             <span>${formatMoney(currentAmount)}</span>
             <span>of ${formatMoney(targetAmount)}</span>
           </div>
+
           <div class="progress-bar">
             <div class="progress-fill" style="width: ${safeProgressPercent}%"></div>
           </div>
+
           <div class="goal-meta">
             <span>${progressPercent}% completed</span>
           </div>
+
           <div class="goal-actions">
             <input type="number" step="0.01" placeholder="Use + amount" id="goal-input-${goal.id}" />
             <button class="primary-btn" onclick="addMoneyToGoal('${goal.id}')">Apply</button>

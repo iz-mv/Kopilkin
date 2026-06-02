@@ -6,6 +6,7 @@
   <title>Kopilkin - Goals</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body class="app-bg">
   <div class="mobile-shell">
     <header class="topbar">
@@ -13,16 +14,19 @@
         <div class="small-label">Savings management</div>
         <h1 class="page-title">Goals</h1>
       </div>
+
       <div class="avatar-circle">H</div>
     </header>
 
     <section class="card">
       <h2 class="section-title">Create new goal</h2>
+
       <form id="goalForm" class="form-block">
         <input type="text" id="goalTitle" placeholder="Goal title" required />
         <input type="number" step="0.01" min="0.01" id="goalTargetAmount" placeholder="Target amount" required />
         <button type="submit" class="primary-btn">Add new goal</button>
       </form>
+
       <p id="goalMessage" class="message-text"></p>
     </section>
 
@@ -31,10 +35,67 @@
         <h2 class="section-title">Your goals</h2>
         <button id="refreshGoalsBtn" class="text-btn">Refresh</button>
       </div>
+
       <div id="goalsList" class="goals-list">
         <p class="muted-text">No goals yet.</p>
       </div>
     </section>
+
+    <div class="goal-image-modal-overlay hidden" id="goalImageModal">
+      <div class="goal-image-modal">
+        <div class="goal-image-modal-header">
+          <div>
+            <div class="small-label">Savings goal image</div>
+            <h2 class="section-title">Update goal image</h2>
+          </div>
+
+          <button type="button" class="goal-image-modal-close" id="goalImageModalCloseBtn">
+            ×
+          </button>
+        </div>
+
+        <p class="muted-text goal-image-modal-hint">
+          Choose an image, then drag it inside the wide frame to adjust the cover.
+          Use mouse wheel or trackpad scroll to zoom.
+        </p>
+
+        <input
+          type="file"
+          id="goalImageFileInput"
+          accept="image/png,image/jpeg,image/webp"
+          hidden
+        />
+
+        <button type="button" class="secondary-btn full-btn" id="chooseGoalImageInsideBtn">
+          Choose image
+        </button>
+
+        <div class="goal-image-crop-area" id="goalImageCropArea">
+          <div class="goal-image-empty-state" id="goalImageEmptyState">
+            No image selected
+          </div>
+
+          <img
+            id="goalImageCropImage"
+            class="hidden"
+            alt="Selected goal cover"
+            draggable="false"
+          />
+        </div>
+
+        <div class="goal-image-modal-actions">
+          <button type="button" class="secondary-btn" id="goalImageCancelBtn">
+            Cancel
+          </button>
+
+          <button type="button" class="primary-btn" id="uploadGoalImageBtn">
+            Upload cropped image
+          </button>
+        </div>
+
+        <p id="goalImageModalMessage" class="message-text"></p>
+      </div>
+    </div>
 
     <nav class="bottom-nav">
       <a href="home.html" class="nav-item">Home</a>
