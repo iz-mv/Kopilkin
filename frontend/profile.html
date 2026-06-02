@@ -19,65 +19,16 @@
     </header>
 
     <section class="card profile-card">
-      <div class="profile-avatar-large" id="profileAvatarLarge">🐷</div>
+      <div class="profile-avatar-large" id="profileAvatarLarge">U</div>
 
       <h2 class="profile-name" id="profileNameText">User</h2>
       <p class="muted-text profile-email" id="profileEmailText">email@example.com</p>
 
       <div class="profile-badge">Auth method: Email / Password</div>
 
-      <div class="avatar-upload-block">
-        <input
-          type="file"
-          id="avatarFileInput"
-          accept="image/png,image/jpeg,image/webp"
-          hidden
-        />
-
-        <button type="button" class="secondary-btn full-btn" id="chooseAvatarBtn">
-          Change profile photo
-        </button>
-
-        <div class="avatar-cropper hidden" id="avatarCropper">
-          <div class="crop-preview">
-            <img id="avatarCropImage" alt="Avatar preview" />
-          </div>
-
-          <label class="small-label" for="avatarZoomRange">Zoom</label>
-          <input
-            type="range"
-            id="avatarZoomRange"
-            min="1"
-            max="2.5"
-            step="0.05"
-            value="1"
-          />
-
-          <label class="small-label" for="avatarXRange">Move horizontally</label>
-          <input
-            type="range"
-            id="avatarXRange"
-            min="-100"
-            max="100"
-            step="1"
-            value="0"
-          />
-
-          <label class="small-label" for="avatarYRange">Move vertically</label>
-          <input
-            type="range"
-            id="avatarYRange"
-            min="-100"
-            max="100"
-            step="1"
-            value="0"
-          />
-
-          <button type="button" class="primary-btn full-btn" id="uploadAvatarBtn">
-            Upload cropped photo
-          </button>
-        </div>
-      </div>
+      <button type="button" class="secondary-btn full-btn avatar-change-btn" id="chooseAvatarBtn">
+        Change profile photo
+      </button>
     </section>
 
     <section class="card">
@@ -109,6 +60,62 @@
     <section class="card">
       <button id="logoutBtn" class="dark-btn full-btn">Logout</button>
     </section>
+
+    <div class="avatar-modal-overlay hidden" id="avatarModal">
+      <div class="avatar-modal">
+        <div class="avatar-modal-header">
+          <div>
+            <div class="small-label">Profile photo</div>
+            <h2 class="section-title">Update avatar</h2>
+          </div>
+
+          <button type="button" class="avatar-modal-close" id="avatarModalCloseBtn">
+            ×
+          </button>
+        </div>
+
+        <p class="muted-text avatar-modal-hint">
+          Choose an image, then drag it inside the square to adjust the crop.
+          Use mouse wheel or trackpad scroll to zoom.
+        </p>
+
+        <input
+          type="file"
+          id="avatarFileInput"
+          accept="image/png,image/jpeg,image/webp"
+          hidden
+        />
+
+        <button type="button" class="secondary-btn full-btn" id="chooseAvatarInsideBtn">
+          Choose image
+        </button>
+
+        <div class="avatar-crop-area" id="avatarCropArea">
+          <div class="avatar-empty-state" id="avatarEmptyState">
+            No image selected
+          </div>
+
+          <img
+            id="avatarCropImage"
+            class="hidden"
+            alt="Selected avatar"
+            draggable="false"
+          />
+        </div>
+
+        <div class="avatar-modal-actions">
+          <button type="button" class="secondary-btn" id="avatarCancelBtn">
+            Cancel
+          </button>
+
+          <button type="button" class="primary-btn" id="uploadAvatarBtn">
+            Upload cropped photo
+          </button>
+        </div>
+
+        <p id="avatarModalMessage" class="message-text"></p>
+      </div>
+    </div>
 
     <nav class="bottom-nav">
       <a href="home.html" class="nav-item">Home</a>

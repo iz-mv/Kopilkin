@@ -723,3 +723,125 @@ select {
   object-fit: cover;
   transform-origin: center center;
 }
+
+.avatar-circle,
+.profile-avatar-large {
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+.avatar-circle.has-image,
+.profile-avatar-large.has-image {
+  color: transparent;
+  font-size: 0;
+}
+
+.avatar-change-btn {
+  margin-top: 16px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.avatar-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.avatar-modal {
+  width: min(420px, 100%);
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 22px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.25);
+}
+
+.avatar-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.avatar-modal-close {
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: #eef4f8;
+  color: #111827;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.avatar-modal-hint {
+  margin: 8px 0 16px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.avatar-crop-area {
+  width: 280px;
+  height: 280px;
+  margin: 18px auto;
+  border-radius: 28px;
+  background: #eef4f8;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.avatar-crop-area:active {
+  cursor: grabbing;
+}
+
+.avatar-crop-area::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 28px;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.02);
+}
+
+.avatar-empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-weight: 700;
+  text-align: center;
+  padding: 20px;
+}
+
+#avatarCropImage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.avatar-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

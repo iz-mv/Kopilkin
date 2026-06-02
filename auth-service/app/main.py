@@ -29,8 +29,11 @@ from app.security import (
     create_access_token,
     decode_access_token,
 )
-
-from app.storage import upload_image_to_minio, delete_file_from_minio
+from app.storage import (
+    upload_image_to_minio,
+    delete_file_from_minio,
+    cleanup_user_avatars_except_current,
+)
 
 
 app = FastAPI(title="Kopilkin Auth Service")
@@ -131,6 +134,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "user_id": user.id,
         "name": user.name,
+        "email": user.email,
+        "avatar_url": user.avatar_url,
     }
 
 
@@ -180,8 +185,15 @@ def upload_my_avatar(
 
     delete_cache(f"user:{current_user.id}")
 
+    # Delete the previously active avatar if possible
     if old_avatar_url:
         delete_file_from_minio(old_avatar_url)
+
+
+    cleanup_user_avatars_except_current(
+        user_id=current_user.id,
+        current_avatar_url=current_user.avatar_url,
+    )
 
     return current_user
 

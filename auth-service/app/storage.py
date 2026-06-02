@@ -1,6 +1,7 @@
 import json
 import os
 import uuid
+from urllib.parse import urlparse
 
 from fastapi import HTTPException, UploadFile
 from minio import Minio
@@ -60,6 +61,26 @@ def ensure_bucket_exists() -> None:
         )
 
 
+def get_object_name_from_url(file_url: str | None) -> str | None:
+
+    if not file_url:
+        return None
+
+    parsed = urlparse(file_url)
+    path = parsed.path.lstrip("/")
+
+    bucket_prefix = f"{MINIO_BUCKET}/"
+
+    if path.startswith(bucket_prefix):
+        return path.replace(bucket_prefix, "", 1)
+
+    public_prefix = f"{MINIO_PUBLIC_URL.rstrip('/')}/"
+    if file_url.startswith(public_prefix):
+        return file_url.replace(public_prefix, "", 1)
+
+    return None
+
+
 def upload_image_to_minio(file: UploadFile, folder: str) -> str:
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
@@ -89,26 +110,44 @@ def upload_image_to_minio(file: UploadFile, folder: str) -> str:
             detail=f"File upload failed: {error}"
         )
 
-    return f"{MINIO_PUBLIC_URL}/{object_name}"
+    return f"{MINIO_PUBLIC_URL.rstrip('/')}/{object_name}"
 
 
 def delete_file_from_minio(file_url: str | None) -> None:
-    if not file_url:
+    object_name = get_object_name_from_url(file_url)
+
+    if not object_name:
         return
-
-    public_prefix = f"{MINIO_PUBLIC_URL}/"
-
-    if not file_url.startswith(public_prefix):
-        return
-
-    object_name = file_url.replace(public_prefix, "", 1)
 
     try:
         minio_client.remove_object(
             bucket_name=MINIO_BUCKET,
             object_name=object_name,
         )
-        print(f"[MinIO] Deleted old file: {object_name}")
+        print(f"[MinIO] Deleted file: {object_name}")
 
     except S3Error as error:
-        print(f"[MinIO] Failed to delete old file {object_name}: {error}")
+        print(f"[MinIO] Failed to delete file {object_name}: {error}")
+
+
+def cleanup_user_avatars_except_current(user_id: str, current_avatar_url: str | None) -> None:
+    ensure_bucket_exists()
+
+    prefix = f"avatars/{user_id}/"
+    current_object_name = get_object_name_from_url(current_avatar_url)
+
+    try:
+        for item in minio_client.list_objects(
+            bucket_name=MINIO_BUCKET,
+            prefix=prefix,
+            recursive=True,
+        ):
+            if item.object_name != current_object_name:
+                minio_client.remove_object(
+                    bucket_name=MINIO_BUCKET,
+                    object_name=item.object_name,
+                )
+                print(f"[MinIO] Cleaned old avatar: {item.object_name}")
+
+    except S3Error as error:
+        print(f"[MinIO] Avatar cleanup failed for user={user_id}: {error}")

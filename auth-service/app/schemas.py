@@ -34,6 +34,8 @@ class LoginResponse(BaseModel):
     token_type: str
     user_id: str
     name: str
+    email: EmailStr
+    avatar_url: Optional[str] = None
 
 
 class LogoutRequest(BaseModel):

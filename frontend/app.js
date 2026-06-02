@@ -57,6 +57,46 @@ function applyAvatar(element, userOrProfile, fallbackText = "U") {
   }
 }
 
+async function refreshCurrentUserProfile() {
+  const user = getCurrentUser();
+
+  if (!user?.user_id) {
+    return null;
+  }
+
+  try {
+    const profile = await apiRequest(`${AUTH_API}/users/${user.user_id}`);
+
+    const updatedUser = {
+      ...user,
+      name: profile.name,
+      email: profile.email,
+      avatar_url: profile.avatar_url || null,
+    };
+
+    setCurrentUser(updatedUser);
+
+    return updatedUser;
+  } catch (error) {
+    console.warn("Could not refresh user profile:", error.message);
+    return user;
+  }
+}
+
+function refreshTopAvatar(avatarElement, user) {
+  if (!avatarElement || !user) return;
+
+  const fallbackLetter = user.name?.[0]?.toUpperCase() || "U";
+  applyAvatar(avatarElement, user, fallbackLetter);
+
+  refreshCurrentUserProfile().then((updatedUser) => {
+    if (!updatedUser) return;
+
+    const updatedFallbackLetter = updatedUser.name?.[0]?.toUpperCase() || "U";
+    applyAvatar(avatarElement, updatedUser, updatedFallbackLetter);
+  });
+}
+
 function redirectToLoginIfNeeded() {
   const user = getCurrentUser();
   if (!user) {
@@ -161,6 +201,7 @@ function setupAuthPage() {
       setCurrentUser({
         user_id: result.user_id,
         name: result.name,
+        email: result.email,
         access_token: result.access_token,
         avatar_url: result.avatar_url || null,
       });
@@ -186,8 +227,7 @@ function setupHomePage() {
   if (!user) return;
 
   const avatar = document.querySelector(".avatar-circle");
-  const fallbackLetter = user.name?.[0]?.toUpperCase() || "U";
-  applyAvatar(avatar, user, fallbackLetter);
+  refreshTopAvatar(avatar, user);
 
   setupLogoutButtons();
   setupTypeChips();
@@ -262,8 +302,7 @@ function setupGoalsPage() {
   if (!user) return;
 
   const avatar = document.querySelector(".avatar-circle");
-  const fallbackLetter = user.name?.[0]?.toUpperCase() || "U";
-  applyAvatar(avatar, user, fallbackLetter);
+  refreshTopAvatar(avatar, user);
 
   setupLogoutButtons();
   loadGoals(user.user_id);
@@ -332,36 +371,54 @@ function setupProfilePage() {
   const profileForm = document.getElementById("profileForm");
 
   const chooseAvatarBtn = document.getElementById("chooseAvatarBtn");
+  const avatarModal = document.getElementById("avatarModal");
+  const avatarModalCloseBtn = document.getElementById("avatarModalCloseBtn");
+  const avatarCancelBtn = document.getElementById("avatarCancelBtn");
+  const chooseAvatarInsideBtn = document.getElementById("chooseAvatarInsideBtn");
   const avatarFileInput = document.getElementById("avatarFileInput");
-  const avatarCropper = document.getElementById("avatarCropper");
+  const avatarCropArea = document.getElementById("avatarCropArea");
   const avatarCropImage = document.getElementById("avatarCropImage");
-  const avatarZoomRange = document.getElementById("avatarZoomRange");
-  const avatarXRange = document.getElementById("avatarXRange");
-  const avatarYRange = document.getElementById("avatarYRange");
+  const avatarEmptyState = document.getElementById("avatarEmptyState");
   const uploadAvatarBtn = document.getElementById("uploadAvatarBtn");
+  const avatarModalMessage = document.getElementById("avatarModalMessage");
 
   let selectedAvatarFile = null;
   let selectedAvatarPreviewUrl = null;
 
+  const cropState = {
+    x: 0,
+    y: 0,
+    scale: 1,
+    dragging: false,
+    startPointerX: 0,
+    startPointerY: 0,
+    startImageX: 0,
+    startImageY: 0,
+  };
+
+  function renderProfile(profile) {
+    const fallbackLetter = profile.name?.[0]?.toUpperCase() || "U";
+
+    applyAvatar(avatar, profile, fallbackLetter);
+    applyAvatar(largeAvatar, profile, fallbackLetter);
+
+    if (nameText) nameText.textContent = profile.name;
+    if (emailText) emailText.textContent = profile.email;
+    if (nameInput) nameInput.value = profile.name;
+    if (emailInput) emailInput.value = profile.email;
+    if (userIdText) userIdText.textContent = user.user_id;
+    if (tokenText) tokenText.textContent = user.access_token || "-";
+  }
+
   apiRequest(`${AUTH_API}/users/${user.user_id}`)
     .then((profile) => {
-      const fallbackLetter = profile.name?.[0]?.toUpperCase() || "U";
-
-      applyAvatar(avatar, profile, fallbackLetter);
-      applyAvatar(largeAvatar, profile, "🐷");
-
-      if (nameText) nameText.textContent = profile.name;
-      if (emailText) emailText.textContent = profile.email;
-      if (nameInput) nameInput.value = profile.name;
-      if (emailInput) emailInput.value = profile.email;
-      if (userIdText) userIdText.textContent = user.user_id;
-      if (tokenText) tokenText.textContent = user.access_token || "-";
+      renderProfile(profile);
 
       setCurrentUser({
         ...user,
         name: profile.name,
         email: profile.email,
-        avatar_url: profile.avatar_url,
+        avatar_url: profile.avatar_url || null,
       });
     })
     .catch((error) => {
@@ -383,64 +440,139 @@ function setupProfilePage() {
         const updatedUser = {
           ...getCurrentUser(),
           name: updated.name,
-          avatar_url: updated.avatar_url,
+          avatar_url: updated.avatar_url || null,
         };
 
         setCurrentUser(updatedUser);
 
-        const fallbackLetter = updated.name?.[0]?.toUpperCase() || "U";
+        renderProfile(updated);
 
-        applyAvatar(avatar, updated, fallbackLetter);
-        applyAvatar(largeAvatar, updated, "🐷");
-
-        if (nameText) nameText.textContent = updated.name;
-
-        profileMessage.textContent = "Profile updated successfully";
+        if (profileMessage) {
+          profileMessage.textContent = "Profile updated successfully";
+        }
       } catch (error) {
-        profileMessage.textContent = error.message;
+        if (profileMessage) {
+          profileMessage.textContent = error.message;
+        }
       }
     });
   }
 
-  function updateCropPreview() {
+  function openAvatarModal() {
+    avatarModal?.classList.remove("hidden");
+    if (avatarModalMessage) avatarModalMessage.textContent = "";
+  }
+
+  function closeAvatarModal() {
+    avatarModal?.classList.add("hidden");
+
+    if (avatarModalMessage) avatarModalMessage.textContent = "";
+    if (avatarFileInput) avatarFileInput.value = "";
+
+    selectedAvatarFile = null;
+
+    if (selectedAvatarPreviewUrl) {
+      URL.revokeObjectURL(selectedAvatarPreviewUrl);
+      selectedAvatarPreviewUrl = null;
+    }
+
+    if (avatarCropImage) {
+      avatarCropImage.src = "";
+      avatarCropImage.classList.add("hidden");
+      avatarCropImage.style.width = "";
+      avatarCropImage.style.height = "";
+      avatarCropImage.style.transform = "";
+    }
+
+    if (avatarEmptyState) {
+      avatarEmptyState.classList.remove("hidden");
+    }
+
+    cropState.x = 0;
+    cropState.y = 0;
+    cropState.scale = 1;
+    cropState.dragging = false;
+  }
+
+  function updateCropImageTransform() {
     if (!avatarCropImage) return;
 
-    const zoom = Number(avatarZoomRange?.value || 1);
-    const x = Number(avatarXRange?.value || 0);
-    const y = Number(avatarYRange?.value || 0);
+    avatarCropImage.style.transform =
+      `translate(-50%, -50%) translate(${cropState.x}px, ${cropState.y}px) scale(${cropState.scale})`;
+  }
 
-    avatarCropImage.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+  function loadImageIntoCropper(file) {
+    selectedAvatarFile = file;
+
+    if (selectedAvatarPreviewUrl) {
+      URL.revokeObjectURL(selectedAvatarPreviewUrl);
+    }
+
+    selectedAvatarPreviewUrl = URL.createObjectURL(file);
+
+    cropState.x = 0;
+    cropState.y = 0;
+    cropState.scale = 1;
+    cropState.dragging = false;
+
+    if (avatarModalMessage) {
+      avatarModalMessage.textContent = "Drag the image to adjust crop. Scroll to zoom.";
+    }
+
+    if (avatarEmptyState) {
+      avatarEmptyState.classList.add("hidden");
+    }
+
+    if (!avatarCropImage || !avatarCropArea) return;
+
+    avatarCropImage.onload = () => {
+      const areaRect = avatarCropArea.getBoundingClientRect();
+
+      const baseScale = Math.max(
+        areaRect.width / avatarCropImage.naturalWidth,
+        areaRect.height / avatarCropImage.naturalHeight
+      );
+
+      avatarCropImage.style.width = `${avatarCropImage.naturalWidth * baseScale}px`;
+      avatarCropImage.style.height = `${avatarCropImage.naturalHeight * baseScale}px`;
+
+      avatarCropImage.classList.remove("hidden");
+      updateCropImageTransform();
+    };
+
+    avatarCropImage.src = selectedAvatarPreviewUrl;
   }
 
   function createCroppedAvatarBlob() {
     return new Promise((resolve, reject) => {
-      if (!selectedAvatarFile) {
-        reject(new Error("No image selected"));
+      if (!selectedAvatarFile || !avatarCropArea) {
+        reject(new Error("Please choose an image first"));
         return;
       }
 
-      const canvas = document.createElement("canvas");
-      const size = 512;
-
-      canvas.width = size;
-      canvas.height = size;
-
-      const ctx = canvas.getContext("2d");
       const image = new Image();
 
       image.onload = () => {
-        const zoom = Number(avatarZoomRange?.value || 1);
-        const x = Number(avatarXRange?.value || 0);
-        const y = Number(avatarYRange?.value || 0);
+        const canvas = document.createElement("canvas");
+        const size = 512;
+
+        canvas.width = size;
+        canvas.height = size;
+
+        const ctx = canvas.getContext("2d");
+        const areaRect = avatarCropArea.getBoundingClientRect();
 
         const baseScale = Math.max(size / image.width, size / image.height);
-        const scale = baseScale * zoom;
+        const scale = baseScale * cropState.scale;
 
         const drawWidth = image.width * scale;
         const drawHeight = image.height * scale;
 
-        const drawX = (size - drawWidth) / 2 + x * 2;
-        const drawY = (size - drawHeight) / 2 + y * 2;
+        const xRatio = size / areaRect.width;
+        const yRatio = size / areaRect.height;
+
+        const drawX = (size - drawWidth) / 2 + cropState.x * xRatio;
+        const drawY = (size - drawHeight) / 2 + cropState.y * yRatio;
 
         ctx.clearRect(0, 0, size, size);
         ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
@@ -464,7 +596,18 @@ function setupProfilePage() {
     });
   }
 
-  chooseAvatarBtn?.addEventListener("click", () => {
+  chooseAvatarBtn?.addEventListener("click", openAvatarModal);
+
+  avatarModalCloseBtn?.addEventListener("click", closeAvatarModal);
+  avatarCancelBtn?.addEventListener("click", closeAvatarModal);
+
+  avatarModal?.addEventListener("click", (event) => {
+    if (event.target === avatarModal) {
+      closeAvatarModal();
+    }
+  });
+
+  chooseAvatarInsideBtn?.addEventListener("click", () => {
     avatarFileInput?.click();
   });
 
@@ -473,42 +616,77 @@ function setupProfilePage() {
 
     if (!file) return;
 
-    selectedAvatarFile = file;
-
-    if (selectedAvatarPreviewUrl) {
-      URL.revokeObjectURL(selectedAvatarPreviewUrl);
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      if (avatarModalMessage) {
+        avatarModalMessage.textContent = "Only JPG, PNG and WEBP images are allowed";
+      }
+      return;
     }
 
-    selectedAvatarPreviewUrl = URL.createObjectURL(file);
-
-    if (avatarCropImage) {
-      avatarCropImage.src = selectedAvatarPreviewUrl;
-    }
-
-    if (avatarCropper) avatarCropper.classList.remove("hidden");
-    if (avatarZoomRange) avatarZoomRange.value = "1";
-    if (avatarXRange) avatarXRange.value = "0";
-    if (avatarYRange) avatarYRange.value = "0";
-
-    updateCropPreview();
-
-    if (profileMessage) {
-      profileMessage.textContent = "Adjust the photo and upload it";
-    }
+    loadImageIntoCropper(file);
   });
 
-  [avatarZoomRange, avatarXRange, avatarYRange].forEach((input) => {
-    input?.addEventListener("input", updateCropPreview);
+  avatarCropArea?.addEventListener("pointerdown", (event) => {
+    if (!selectedAvatarFile) return;
+
+    cropState.dragging = true;
+    cropState.startPointerX = event.clientX;
+    cropState.startPointerY = event.clientY;
+    cropState.startImageX = cropState.x;
+    cropState.startImageY = cropState.y;
+
+    avatarCropArea.setPointerCapture(event.pointerId);
+  });
+
+  avatarCropArea?.addEventListener("pointermove", (event) => {
+    if (!cropState.dragging) return;
+
+    const deltaX = event.clientX - cropState.startPointerX;
+    const deltaY = event.clientY - cropState.startPointerY;
+
+    cropState.x = cropState.startImageX + deltaX;
+    cropState.y = cropState.startImageY + deltaY;
+
+    updateCropImageTransform();
+  });
+
+  avatarCropArea?.addEventListener("pointerup", (event) => {
+    cropState.dragging = false;
+
+    try {
+      avatarCropArea.releasePointerCapture(event.pointerId);
+    } catch (_) {}
+  });
+
+  avatarCropArea?.addEventListener("pointercancel", () => {
+    cropState.dragging = false;
+  });
+
+  avatarCropArea?.addEventListener("pointerleave", () => {
+    cropState.dragging = false;
+  });
+
+  avatarCropArea?.addEventListener("wheel", (event) => {
+    if (!selectedAvatarFile) return;
+
+    event.preventDefault();
+
+    const direction = event.deltaY < 0 ? 1 : -1;
+    const nextScale = cropState.scale + direction * 0.08;
+
+    cropState.scale = Math.min(Math.max(nextScale, 1), 3);
+
+    updateCropImageTransform();
   });
 
   uploadAvatarBtn?.addEventListener("click", async () => {
     try {
       if (!selectedAvatarFile) {
-        profileMessage.textContent = "Please choose an image first";
+        avatarModalMessage.textContent = "Please choose an image first";
         return;
       }
 
-      profileMessage.textContent = "Uploading avatar...";
+      avatarModalMessage.textContent = "Uploading avatar...";
 
       const croppedBlob = await createCroppedAvatarBlob();
 
@@ -529,29 +707,20 @@ function setupProfilePage() {
         ...currentUser,
         name: updated.name,
         email: updated.email,
-        avatar_url: updated.avatar_url,
+        avatar_url: updated.avatar_url || null,
       };
 
       setCurrentUser(updatedUser);
 
-      const fallbackLetter = updated.name?.[0]?.toUpperCase() || "U";
+      renderProfile(updated);
 
-      applyAvatar(avatar, updated, fallbackLetter);
-      applyAvatar(largeAvatar, updated, "🐷");
+      avatarModalMessage.textContent = "Avatar updated successfully";
 
-      if (avatarCropper) avatarCropper.classList.add("hidden");
-      if (avatarFileInput) avatarFileInput.value = "";
-
-      selectedAvatarFile = null;
-
-      if (selectedAvatarPreviewUrl) {
-        URL.revokeObjectURL(selectedAvatarPreviewUrl);
-        selectedAvatarPreviewUrl = null;
-      }
-
-      profileMessage.textContent = "Avatar updated successfully";
+      setTimeout(() => {
+        closeAvatarModal();
+      }, 500);
     } catch (error) {
-      profileMessage.textContent = error.message;
+      avatarModalMessage.textContent = error.message;
     }
   });
 }
@@ -563,8 +732,7 @@ function setupAIPage() {
   setupLogoutButtons();
 
   const avatar = document.querySelector(".avatar-circle");
-  const fallbackLetter = user.name?.[0]?.toUpperCase() || "U";
-  applyAvatar(avatar, user, fallbackLetter);
+  refreshTopAvatar(avatar, user);
 
   const form = document.getElementById("aiChatForm");
   const input = document.getElementById("aiChatInput");
