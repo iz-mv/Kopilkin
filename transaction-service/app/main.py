@@ -36,8 +36,20 @@ def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
             detail="Transaction type must be either 'income' or 'expense'"
         )
 
+    transaction_id = data.id or str(uuid.uuid4())
+
+    # Idempotency: if another service retries the same request with the same id, we return the existing transaction instead of creating a duplicate
+    existing_transaction = (
+        db.query(Transaction)
+        .filter(Transaction.id == transaction_id)
+        .first()
+    )
+
+    if existing_transaction:
+        return existing_transaction
+
     transaction = Transaction(
-        id=str(uuid.uuid4()),
+        id=transaction_id,
         user_id=data.user_id,
         amount=data.amount,
         category=data.category,
@@ -151,7 +163,7 @@ def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
         event=deleted_event,
     )
 
-    #the financial summary changed, so the old redis cache must be removed
+    # the financial summary changed, so the old redis cache must be removed
     delete_cache(f"summary:{deleted_event['user_id']}")
 
     return {

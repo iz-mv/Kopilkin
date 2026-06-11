@@ -1371,6 +1371,16 @@ async function loadGoals(userId) {
   }
 }
 
+function getGoalStatusLabel(status) {
+  const labels = {
+    ACTIVE: "Active",
+    COMPLETED: "Completed",
+    DELETED: "Deleted",
+  };
+
+  return labels[status] || status || "Active";
+}
+
 function renderGoals(goals) {
   const container = document.getElementById("goalsList");
   if (!container) return;
@@ -1391,6 +1401,7 @@ function renderGoals(goals) {
 
       const safeProgressPercent = Math.min(Math.max(progressPercent, 0), 100);
       const safeImageUrl = goal.image_url ? String(goal.image_url).replaceAll('"', '&quot;') : "";
+      const goalStatus = getGoalStatusLabel(goal.status);
 
       return `
         <div class="goal-card">
@@ -1404,7 +1415,7 @@ function renderGoals(goals) {
           <div class="goal-card-header-row">
             <div>
               <div class="goal-title">${goal.title}</div>
-              <div class="small-label">Savings target</div>
+              <div class="small-label">Savings target · ${goalStatus}</div>
             </div>
 
             <button
@@ -1429,20 +1440,34 @@ function renderGoals(goals) {
             <span>${progressPercent}% completed</span>
           </div>
 
-          <div class="goal-actions">
-            <input type="number" step="0.01" placeholder="Use + amount" id="goal-input-${goal.id}" />
-            <button class="primary-btn" onclick="addMoneyToGoal('${goal.id}')">Apply</button>
+          <div class="goal-actions goal-money-actions">
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder="Amount"
+              id="goal-input-${goal.id}"
+            />
+            <button class="primary-btn" onclick="createGoalOperation('${goal.id}', 'DEPOSIT')">
+              Deposit
+            </button>
+            <button class="secondary-btn" onclick="createGoalOperation('${goal.id}', 'WITHDRAW')">
+              Withdraw
+            </button>
           </div>
+
+          <p class="message-text goal-operation-message" id="goal-message-${goal.id}"></p>
         </div>
       `;
     })
     .join("");
 }
 
-async function addMoneyToGoal(goalId) {
+async function createGoalOperation(goalId, operationType) {
   const input = document.getElementById(`goal-input-${goalId}`);
+  const message = document.getElementById(`goal-message-${goalId}`);
   const user = getCurrentUser();
-  const amount = parseFloat(input.value);
+  const amount = parseFloat(input?.value);
 
   if (!amount || amount <= 0) {
     alert("Amount must be greater than 0");
@@ -1450,14 +1475,40 @@ async function addMoneyToGoal(goalId) {
   }
 
   try {
-    await apiRequest(`${SAVINGS_API}/goals/${goalId}/add`, {
-      method: "PATCH",
-      body: JSON.stringify({ amount: amount }),
+    if (message) {
+      message.textContent = `${operationType === "DEPOSIT" ? "Deposit" : "Withdraw"} operation created. Processing...`;
+    }
+
+    await apiRequest(`${SAVINGS_API}/goals/${goalId}/operations`, {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: user.user_id,
+        operation_type: operationType,
+        amount: amount,
+      }),
     });
 
-    input.value = "";
+    if (input) input.value = "";
+
+    // Worker processes Kafka event asynchronously, so we refresh twice:
+    // immediately and after a short delay.
     loadGoals(user.user_id);
+
+    setTimeout(() => {
+      loadGoals(user.user_id);
+      loadTransactionsAndSummary?.(user.user_id);
+      loadRecommendations?.(user.user_id);
+    }, 1800);
   } catch (error) {
-    alert(error.message);
+    if (message) {
+      message.textContent = error.message;
+    } else {
+      alert(error.message);
+    }
   }
+}
+
+// Backward compatibility for older buttons/code.
+async function addMoneyToGoal(goalId) {
+  return createGoalOperation(goalId, "DEPOSIT");
 }

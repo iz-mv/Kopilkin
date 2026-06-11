@@ -1,0 +1,19 @@
+User clicks Deposit / Withdraw
+        ↓
+savings-service creates GoalOperation with PENDING status
+        ↓
+savings-service publishes Kafka event: goal.operation.created
+        ↓
+worker-service consumes this event
+        ↓
+worker-service changes status:
+PENDING → PROCESSING → CONFIRMED / FAILED
+        ↓
+worker-service updates goal.current_amount
+        ↓
+worker-service creates matching transaction in transaction-service
+
+
+
+
+docker compose exec postgres psql -U kopilkin -d savings_db -c "SELECT id, goal_id, operation_type, amount, status, failure_reason FROM goal_operations ORDER BY created_at DESC LIMIT 10;"

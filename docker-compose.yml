@@ -98,6 +98,30 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  worker-service:
+    build:
+      context: ./worker-service
+      dockerfile: Dockerfile
+    container_name: kopilkin-worker-service
+    environment:
+      SAVINGS_DATABASE_URL: "postgresql://kopilkin:kopilkin_password@postgres:5432/savings_db"
+      TRANSACTION_SERVICE_URL: "http://transaction-service:8002"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      REDIS_URL: "redis://redis:6379/0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_started
+      savings-service:
+        condition: service_started
+      transaction-service:
+        condition: service_started
+    restart: unless-stopped
+
+
   kafka:
     image: apache/kafka:3.8.0
     container_name: kopilkin-kafka

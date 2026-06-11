@@ -1,11 +1,13 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TransactionCreate(BaseModel):
+    # Optional id is used for idempotency when another service creates a transaction from a confirmed goal operation.
+    id: Optional[str] = None
     user_id: str
-    amount: float
+    amount: float = Field(gt=0)
     category: str
     type: str
     description: Optional[str] = None

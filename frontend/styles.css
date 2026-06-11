@@ -992,3 +992,26 @@ select {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+
+/* Goal operation controls */
+.goal-money-actions {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.goal-money-actions input {
+  min-width: 0;
+}
+
+.goal-operation-message {
+  min-height: 18px;
+  margin-top: 8px;
+}
+
+@media (max-width: 420px) {
+  .goal-money-actions {
+    grid-template-columns: 1fr;
+  }
+}
