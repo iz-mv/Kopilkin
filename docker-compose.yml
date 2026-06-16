@@ -322,6 +322,18 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kopilkin-frontend
+    ports:
+      - "5500:80"
+    depends_on:
+      nginx-balancer:
+        condition: service_started
+    restart: unless-stopped
+
   minio:
     image: minio/minio:latest
     container_name: kopilkin-minio
