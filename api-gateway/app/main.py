@@ -7,6 +7,7 @@ import redis
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
+from app.grpc_client import get_user_summary_via_grpc
 
 
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8001")
@@ -99,7 +100,7 @@ async def proxy_request(
     headers = dict(request.headers)
     headers.pop("host", None)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=900.0) as client:
         response = await client.request(
             method=request.method,
             url=target_url,
@@ -143,6 +144,10 @@ async def transactions_root_proxy(request: Request):
         request=request,
         target_base_url=f"{TRANSACTION_SERVICE_URL}/transactions",
     )
+
+@app.get("/transactions/{user_id}/summary")
+def transactions_summary_grpc(user_id: str):
+    return get_user_summary_via_grpc(user_id)
 
 
 @app.api_route("/transactions/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

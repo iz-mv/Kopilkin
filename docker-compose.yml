@@ -13,8 +13,8 @@ services:
       QDRANT_HOST: "qdrant"
       QDRANT_PORT: "6333"
 
-      LANGFUSE_PUBLIC_KEY: "pk-lf-8e68e5a6-89f8-49f4-b08c-8b04167ea257"
-      LANGFUSE_SECRET_KEY: "sk-lf-7f08364b-673e-4c8f-9825-3699ca37c805"
+      LANGFUSE_PUBLIC_KEY: "pk-lf-96179bdb-dceb-4281-97e9-8cedfa91e00b"
+      LANGFUSE_SECRET_KEY: "sk-lf-103da966-ec61-414d-98c2-4140beb75448"
       LANGFUSE_HOST: "http://langfuse:3000"
       LANGFUSE_BASE_URL: "http://langfuse:3000"
     depends_on:
@@ -260,6 +260,7 @@ services:
       INSTANCE_NAME: "api-gateway-1"
       AUTH_SERVICE_URL: "http://auth-service:8001"
       TRANSACTION_SERVICE_URL: "http://transaction-service:8002"
+      TRANSACTION_GRPC_TARGET: "transaction-service:50051"
       SAVINGS_SERVICE_URL: "http://savings-service:8003"
       AGENT_SERVICE_URL: "http://agent-service:8004"
       RECSYS_SERVICE_URL: "http://recsys-service:8005"
@@ -290,6 +291,7 @@ services:
       INSTANCE_NAME: "api-gateway-2"
       AUTH_SERVICE_URL: "http://auth-service:8001"
       TRANSACTION_SERVICE_URL: "http://transaction-service:8002"
+      TRANSACTION_GRPC_TARGET: "transaction-service:50051"
       SAVINGS_SERVICE_URL: "http://savings-service:8003"
       AGENT_SERVICE_URL: "http://agent-service:8004"
       RECSYS_SERVICE_URL: "http://recsys-service:8005"

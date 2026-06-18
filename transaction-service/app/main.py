@@ -1,13 +1,16 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-import uuid
 
 from app.database import Base, engine, get_db
-from app.models import Transaction
 from app.schemas import TransactionCreate, TransactionResponse, SummaryResponse
-from app.events import publish_event
-from app.cache import get_cache, set_cache, delete_cache
+from app.service import (
+    create_transaction_logic,
+    delete_transaction_logic,
+    get_user_summary_logic,
+    get_user_transactions_logic,
+)
+from app.grpc_server import start_grpc_server, stop_grpc_server
 
 
 app = FastAPI(title="Kopilkin Transaction Service")
@@ -23,150 +26,45 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 
+@app.on_event("startup")
+def on_startup():
+    start_grpc_server()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    stop_grpc_server()
+
+
 @app.get("/")
 def root():
-    return {"service": "transaction-service", "status": "running"}
+    return {
+        "service": "transaction-service",
+        "status": "running",
+        "grpc": "enabled",
+    }
 
 
 @app.post("/transactions", response_model=TransactionResponse)
 def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
-    if data.type not in ["income", "expense"]:
-        raise HTTPException(
-            status_code=400,
-            detail="Transaction type must be either 'income' or 'expense'"
-        )
-
-    transaction_id = data.id or str(uuid.uuid4())
-
-    # Idempotency: if another service retries the same request with the same id, we return the existing transaction instead of creating a duplicate
-    existing_transaction = (
-        db.query(Transaction)
-        .filter(Transaction.id == transaction_id)
-        .first()
-    )
-
-    if existing_transaction:
-        return existing_transaction
-
-    transaction = Transaction(
-        id=transaction_id,
-        user_id=data.user_id,
-        amount=data.amount,
-        category=data.category,
-        type=data.type,
-        description=data.description,
-        date=data.date,
-    )
-
-    db.add(transaction)
-    db.commit()
-    db.refresh(transaction)
-
-    publish_event(
-        topic="transaction.created",
-        key=transaction.user_id,
-        event={
-            "event_type": "transaction.created",
-            "transaction_id": transaction.id,
-            "user_id": transaction.user_id,
-            "amount": transaction.amount,
-            "category": transaction.category,
-            "type": transaction.type,
-            "description": transaction.description,
-            "date": transaction.date,
-        },
-    )
-
-    # the financial summary changed, so the old redis cache must be removed
-    delete_cache(f"summary:{transaction.user_id}")
-
-    return transaction
+    return create_transaction_logic(data=data, db=db)
 
 
 @app.get("/transactions/{user_id}", response_model=list[TransactionResponse])
 def get_user_transactions(user_id: str, db: Session = Depends(get_db)):
-    transactions = (
-        db.query(Transaction)
-        .filter(Transaction.user_id == user_id)
-        .order_by(Transaction.created_at.desc())
-        .all()
-    )
-
-    return transactions
+    return get_user_transactions_logic(user_id=user_id, db=db)
 
 
 @app.get("/transactions/{user_id}/summary", response_model=SummaryResponse)
 def get_user_summary(user_id: str, db: Session = Depends(get_db)):
-    cache_key = f"summary:{user_id}"
-
-    cached_summary = get_cache(cache_key)
-    if cached_summary:
-        return cached_summary
-
-    transactions = (
-        db.query(Transaction)
-        .filter(Transaction.user_id == user_id)
-        .all()
-    )
-
-    total_income = sum(t.amount for t in transactions if t.type == "income")
-    total_expense = sum(t.amount for t in transactions if t.type == "expense")
-    balance = total_income - total_expense
-
-    summary = {
-        "user_id": user_id,
-        "total_income": total_income,
-        "total_expense": total_expense,
-        "balance": balance,
-        "transactions_count": len(transactions),
-    }
-
-    # storing summary in redis for 60 seconds
-    set_cache(cache_key, summary, ttl_seconds=60)
-
-    return summary
+    return get_user_summary_logic(user_id=user_id, db=db)
 
 
 @app.get("/summary/{user_id}", response_model=SummaryResponse)
 def get_user_summary_alias(user_id: str, db: Session = Depends(get_db)):
-    return get_user_summary(user_id, db)
+    return get_user_summary_logic(user_id=user_id, db=db)
 
 
 @app.delete("/transactions/{transaction_id}")
 def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
-    transaction = (
-        db.query(Transaction)
-        .filter(Transaction.id == transaction_id)
-        .first()
-    )
-
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-
-    deleted_event = {
-        "event_type": "transaction.deleted",
-        "transaction_id": transaction.id,
-        "user_id": transaction.user_id,
-        "amount": transaction.amount,
-        "category": transaction.category,
-        "type": transaction.type,
-        "description": transaction.description,
-        "date": transaction.date,
-    }
-
-    db.delete(transaction)
-    db.commit()
-
-    publish_event(
-        topic="transaction.deleted",
-        key=deleted_event["user_id"],
-        event=deleted_event,
-    )
-
-    # the financial summary changed, so the old redis cache must be removed
-    delete_cache(f"summary:{deleted_event['user_id']}")
-
-    return {
-        "message": "Transaction deleted successfully",
-        "transaction_id": transaction_id,
-    }
+    return delete_transaction_logic(transaction_id=transaction_id, db=db)

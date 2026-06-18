@@ -40,10 +40,16 @@ Your job:
 - Compare income vs expenses
 - Identify spending patterns
 
+Language rule:
+- Always answer in the same language as the user's message.
+- If the user writes in Russian, answer in Russian.
+- If the user writes in English, answer in English.
+- Financial data, system context, summaries, categories, or technical fields may be written in English, but you must not copy their language.
+- The response language must follow the user's message, not the financial data context.
+
 Always base your answer on the actual data provided to you.
 If there is not enough data, say it clearly.
 Be concise and specific. Use numbers.
-Respond in the same language the user writes in.
 """
 
 ADVISOR_PROMPT = f"""You are the Kopilkin advisor agent.
@@ -61,7 +67,13 @@ Your job:
 - Give motivating and realistic advice
 - Reference the user's actual numbers when giving advice
 
+Language rule:
+- Always answer in the same language as the user's message.
+- If the user writes in Russian, answer in Russian.
+- If the user writes in English, answer in English.
+- Financial data, system context, summaries, categories, or technical fields may be written in English, but you must not copy their language.
+- The response language must follow the user's message, not the financial data context.
+
 Never give generic advice. Always refer to the real data.
 Do not give investment, trading, tax, or legal advice.
-Respond in the same language the user writes in.
 """

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package transaction;
+
+service TransactionService {
+  rpc GetUserSummary (UserSummaryRequest) returns (UserSummaryResponse);
+}
+
+message UserSummaryRequest {
+  string user_id = 1;
+}
+
+message UserSummaryResponse {
+  string user_id = 1;
+  double income = 2;
+  double expense = 3;
+  double balance = 4;
+}

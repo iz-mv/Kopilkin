@@ -84,3 +84,19 @@ nginx-balancer :8088
 api-gateway-1 / api-gateway-2
    ↓
 microservices
+
+
+grpc test:
+
+curl http://localhost:8088/transactions/7cd18cec-c526-40a4-a4ab-30c20b8fcb21/summary
+
+
+Frontend
+↓ REST
+API Gateway
+↓ gRPC
+Savings Service
+↓ Kafka
+Worker Service
+↓
+PostgreSQL + Transaction Service
