@@ -18,6 +18,7 @@ from app.storage import (
     delete_file_from_minio,
     cleanup_goal_images_except_current,
 )
+from app.grpc_server import start_grpc_server, stop_grpc_server
 
 
 app = FastAPI(title="Kopilkin Savings Service")
@@ -31,6 +32,17 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+
+
+@app.on_event("startup")
+def on_startup():
+    start_grpc_server()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    stop_grpc_server()
+
 
 
 @app.get("/")

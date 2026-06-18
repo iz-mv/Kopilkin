@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package savings;
+
+service SavingsService {
+  rpc CreateGoalOperation (CreateGoalOperationRequest) returns (GoalOperationResponse);
+}
+
+message CreateGoalOperationRequest {
+  string goal_id = 1;
+  string user_id = 2;
+  string operation_type = 3;
+  double amount = 4;
+}
+
+message GoalOperationResponse {
+  string id = 1;
+  string user_id = 2;
+  string goal_id = 3;
+  string operation_type = 4;
+  double amount = 5;
+  string status = 6;
+  string failure_reason = 7;
+  string created_at = 8;
+  string processed_at = 9;
+  string transport = 10;
+}

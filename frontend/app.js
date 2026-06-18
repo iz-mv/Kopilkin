@@ -1479,7 +1479,7 @@ async function createGoalOperation(goalId, operationType) {
       message.textContent = `${operationType === "DEPOSIT" ? "Deposit" : "Withdraw"} operation created. Processing...`;
     }
 
-    await apiRequest(`${SAVINGS_API}/goals/${goalId}/operations`, {
+    await apiRequest(`${SAVINGS_API}/grpc/goals/${goalId}/operations`, {
       method: "POST",
       body: JSON.stringify({
         user_id: user.user_id,

@@ -4,10 +4,15 @@ from typing import Optional
 
 import httpx
 import redis
-from fastapi import FastAPI, Request
+import grpc
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
-from app.grpc_client import get_user_summary_via_grpc
+from pydantic import BaseModel, Field
+from app.grpc_client import (
+    get_user_summary_via_grpc,
+    create_goal_operation_via_grpc,
+)
 
 
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8001")
@@ -24,6 +29,13 @@ redis_client = redis.Redis.from_url(
     REDIS_URL,
     decode_responses=True,
 )
+
+
+
+class GatewayGoalOperationCreate(BaseModel):
+    user_id: Optional[str] = None
+    operation_type: str = Field(pattern="^(DEPOSIT|WITHDRAW)$")
+    amount: float = Field(gt=0)
 
 app = FastAPI(title="Kopilkin API Gateway")
 
@@ -166,6 +178,36 @@ async def summary_proxy(path: str, request: Request):
         target_base_url=TRANSACTION_SERVICE_URL,
         path=f"summary/{path}",
     )
+
+
+@app.post("/grpc/goals/{goal_id}/operations")
+def create_goal_operation_grpc_endpoint(
+    goal_id: str,
+    data: GatewayGoalOperationCreate,
+):
+    try:
+        return create_goal_operation_via_grpc(
+            goal_id=goal_id,
+            user_id=data.user_id or "",
+            operation_type=data.operation_type,
+            amount=data.amount,
+        )
+    except grpc.RpcError as error:
+        grpc_code = error.code()
+
+        if grpc_code == grpc.StatusCode.NOT_FOUND:
+            status_code = 404
+        elif grpc_code == grpc.StatusCode.PERMISSION_DENIED:
+            status_code = 403
+        elif grpc_code == grpc.StatusCode.INVALID_ARGUMENT:
+            status_code = 400
+        else:
+            status_code = 502
+
+        raise HTTPException(
+            status_code=status_code,
+            detail=error.details() or "Savings gRPC request failed",
+        )
 
 
 @app.api_route("/goals", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

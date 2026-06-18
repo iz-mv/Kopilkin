@@ -100,3 +100,18 @@ Savings Service
 Worker Service
 ↓
 PostgreSQL + Transaction Service
+
+
+frontend/app.js
+↓
+POST /grpc/goals/{goal_id}/operations
+↓
+api-gateway
+↓
+SavingsService.CreateGoalOperation через gRPC
+↓
+savings-service создаёт GoalOperation со статусом PENDING
+↓
+savings-service публикует goal.operation.created в Kafka
+↓
+worker-service обрабатывает операцию

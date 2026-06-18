@@ -81,8 +81,10 @@ services:
     container_name: kopilkin-savings-service
     ports:
       - "8003:8003"
+      - "50052:50052"
     environment:
       SAVINGS_DATABASE_URL: "postgresql://kopilkin:kopilkin_password@postgres:5432/savings_db"
+      SAVINGS_GRPC_PORT: "50052"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       MINIO_ENDPOINT: "minio:9000"
       MINIO_ACCESS_KEY: "kopilkin"
@@ -262,6 +264,7 @@ services:
       TRANSACTION_SERVICE_URL: "http://transaction-service:8002"
       TRANSACTION_GRPC_TARGET: "transaction-service:50051"
       SAVINGS_SERVICE_URL: "http://savings-service:8003"
+      SAVINGS_GRPC_TARGET: "savings-service:50052"
       AGENT_SERVICE_URL: "http://agent-service:8004"
       RECSYS_SERVICE_URL: "http://recsys-service:8005"
       REDIS_URL: "redis://redis:6379/0"
@@ -293,6 +296,7 @@ services:
       TRANSACTION_SERVICE_URL: "http://transaction-service:8002"
       TRANSACTION_GRPC_TARGET: "transaction-service:50051"
       SAVINGS_SERVICE_URL: "http://savings-service:8003"
+      SAVINGS_GRPC_TARGET: "savings-service:50052"
       AGENT_SERVICE_URL: "http://agent-service:8004"
       RECSYS_SERVICE_URL: "http://recsys-service:8005"
       REDIS_URL: "redis://redis:6379/0"

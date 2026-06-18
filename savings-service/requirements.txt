@@ -6,3 +6,7 @@ sqlalchemy
 psycopg2-binary
 kafka-python
 minio
+grpcio
+grpcio-tools
+protobuf
+
