@@ -1,187 +1,343 @@
-# Kopilkin
-
-**Kopilkin** is a mobile-first personal finance web application with microservices, event-driven communication, caching, a routing layer, a recommendation service, and a local multi-agent AI assistant.
+# Kopilkin — Microservice Personal Finance Assistant
 
 **Author:** Mubarakov Islam  
-**Current architecture version:** Block 3 / updated C4 architecture  
-**Main public entrypoint for the application backend:** `http://127.0.0.1:8088`
+**Project type:** Semester project / Software Engineering  
+**Main stack:** FastAPI, Docker Compose, PostgreSQL, Redis, Kafka, gRPC, MinIO, Nginx, Ollama, Qdrant, Langfuse, pytest  
+**Main backend entrypoint:** `http://localhost:8088`  
+**Frontend:** `http://localhost:5500`
 
 ---
 
-## 1. What the system does
+## 1. Project Overview
+
+**Kopilkin** is a personal finance assistant built as a microservice-based system. The application helps users track income and expenses, manage savings goals, receive recommendations, and ask a local AI assistant for financial analysis and budgeting advice.
+
+The project was extended from a simple finance MVP into a distributed system that demonstrates the main course requirements:
+
+- independent FastAPI microservices;
+- API Gateway and Nginx load balancing;
+- PostgreSQL data persistence;
+- Redis caching, token blacklist, rate limiting, and worker locks;
+- Kafka event-driven communication;
+- gRPC communication between services;
+- MinIO object storage for uploaded images;
+- AI assistant with local LLM, memory, and observability;
+- integration tests for real Docker Compose flows.
+
+---
+
+## 2. Main User Features
 
 Users can:
 
 - register and log in;
+- upload a profile avatar;
 - add income and expense transactions;
 - view financial summaries;
-- create and update savings goals;
-- receive smart recommendations based on spending behavior;
-- ask a local AI assistant to analyze expenses and give budgeting advice.
-
-The project started as a simple MVP and was extended into a microservice-based system for the software engineering task block.
+- create savings goals;
+- upload savings goal images;
+- deposit money into savings goals;
+- withdraw money from savings goals;
+- receive automatic linked transactions for confirmed savings operations;
+- receive heuristic recommendations based on real transaction history;
+- ask an AI assistant to analyze expenses and give budgeting advice.
 
 ---
 
-## 2. Current architecture summary
+## 3. Architecture Summary
 
 ```text
-Frontend :5500
-   ↓
+User / Browser
+    ↓
+Frontend container :5500
+    ↓ HTTP
 Nginx Load Balancer :8088
-   ↓
-API Gateway service, 2 Docker instances
-   ↓
-   ├── Auth Service        → PostgreSQL auth_db + Redis cache + Kafka events
-   ├── Transaction Service → PostgreSQL transaction_db + Redis cache + Kafka events
-   ├── Savings Service     → PostgreSQL savings_db + Kafka events
-   ├── Agent Service       → Ollama + Mem0 + Qdrant + Langfuse + Prometheus metrics
-   └── RecSys Service      → Transaction Service + Kafka events
+    ↓
+API Gateway replicas
+    ├── api-gateway-1
+    └── api-gateway-2
+    ↓
+Microservices:
+    ├── Auth Service
+    ├── Transaction Service
+    ├── Savings Service
+    ├── Worker Service
+    ├── Recommendation Service
+    └── Agent Service
 ```
 
 Supporting infrastructure:
 
 ```text
-PostgreSQL 16       core business data, logically separated databases
-Kafka 3.8           event log and event-driven integration
-Kafka UI            topic/message inspection
-Redis 7             cache and rate limiter counters
-Qdrant              vector memory for the AI assistant
-Langfuse + Postgres LLM/agent traces
-Nginx               load balancing between API Gateway instances
-Ollama              local LLM runtime on the host machine
+PostgreSQL      persistent business data
+Redis           cache, rate limiter, JWT blacklist, worker locks
+Kafka           event-driven communication
+Kafka UI        Kafka monitoring
+MinIO           avatar and savings-goal image storage
+Qdrant          vector memory for the AI assistant
+Langfuse        LLM/agent observability
+Ollama          local LLM runtime on the host machine
+Nginx           load balancing for API Gateway replicas
 ```
 
 ---
 
-## 3. Services and ports
+## 4. Services and Ports
 
-| Component | Port | Type | Responsibility |
+| Service | Port | Technology | Responsibility |
 |---|---:|---|---|
-| `frontend` | `5500` | Static HTML/CSS/JS | Mobile-first user interface |
-| `nginx-balancer` | `8088` | Nginx | Public backend entrypoint and load balancer |
-| `api-gateway-1` | internal `8000` | FastAPI | Routing and Redis-based rate limiting |
-| `api-gateway-2` | internal `8000` | FastAPI | Second gateway instance for load balancing |
-| `auth-service` | `8001` | FastAPI | Registration, login, user profile |
-| `transaction-service` | `8002` | FastAPI | Income/expense transactions and summaries |
-| `savings-service` | `8003` | FastAPI | Savings goals |
-| `agent-service` | `8004` | FastAPI | Multi-agent AI assistant |
-| `recsys-service` | `8005` | FastAPI | Smart recommendations |
-| `kafka-ui` | `8080` | Web UI | Kafka topic inspection |
-| `postgres` | `5432` | PostgreSQL | `auth_db`, `transaction_db`, `savings_db` |
-| `redis` | `6379` | Redis | Cache and rate limit counters |
-| `qdrant` | `6333` | Vector DB | Long-term AI memory |
-| `langfuse` | `3000` | Web UI | LLM/agent observability |
+| `frontend` | `5500` | Nginx + static HTML/CSS/JS | User interface |
+| `nginx-balancer` | `8088` | Nginx | Public backend entrypoint and load balancing |
+| `api-gateway-1` | internal `8000` | FastAPI | Routing, rate limiting, gRPC client calls |
+| `api-gateway-2` | internal `8000` | FastAPI | Second gateway replica |
+| `auth-service` | `8001` | FastAPI | Users, registration, login, JWT, avatars |
+| `transaction-service` | `8002`, gRPC `50051` | FastAPI + gRPC | Transactions and financial summaries |
+| `savings-service` | `8003`, gRPC `50052` | FastAPI + gRPC | Savings goals and goal operations |
+| `worker-service` | internal | Python worker | Kafka consumer for goal operations |
+| `agent-service` | `8004` | FastAPI + Ollama | Multi-agent AI assistant |
+| `recsys-service` | `8005` | FastAPI | Recommendations from transaction data |
+| `postgres` | `5432` | PostgreSQL 16 | `auth_db`, `transaction_db`, `savings_db` |
+| `redis` | `6379` | Redis 7 | Cache, rate limiting, blacklist, locks |
+| `kafka` | `9092` | Apache Kafka | Event streaming |
+| `kafka-ui` | `8080` | Kafka UI | Kafka topic inspection |
+| `minio` | `9000`, console `9001` | MinIO | Object storage for images |
+| `qdrant` | `6333` | Qdrant | Vector memory |
+| `langfuse` | `3000` | Langfuse | LLM traces and observability |
 
 ---
 
-## 4. Block 3 requirements covered by the current architecture
+## 5. Databases and Storage
 
-### 5. Communication between microservices via Kafka / EDA
+The project uses a logical database-per-service pattern inside PostgreSQL.
 
-Kafka is used as the event backbone. Services publish business events after important state changes.
-
-Current topics:
-
-```text
-user.registered
-transaction.created
-transaction.deleted
-goal.created
-goal.updated
-recommendation.requested
-recommendation.generated
-```
-
-Implemented producers:
-
-- `auth-service/app/events.py`
-- `transaction-service/app/events.py`
-- `savings-service/app/events.py`
-- `recsys-service/app/events.py`
-
-The current implementation mainly uses Kafka as an event log / asynchronous integration base. This is enough to demonstrate Event-Driven Architecture, and it can later be extended with consumers for analytics, notifications, fraud checks, or materialized recommendation views.
-
-### 6. Data layer
-
-Core business data is stored in PostgreSQL using a logical database-per-service pattern:
-
-| Service | Database | Main table |
+| Service | Database | Main tables |
 |---|---|---|
 | Auth Service | `auth_db` | `users` |
 | Transaction Service | `transaction_db` | `transactions` |
-| Savings Service | `savings_db` | `savings_goals` |
+| Savings Service | `savings_db` | `savings_goals`, `goal_operations` |
 
 Additional storage:
 
-| Component | Storage role |
+| Component | Role |
 |---|---|
-| Qdrant | Vector memory for AI assistant |
-| Redis | Cache and operational counters |
-| Kafka | Event log |
-| Langfuse DB | LLM trace storage |
+| Redis | user cache, summary cache, rate limit counters, JWT blacklist, goal locks |
+| Kafka | event log and asynchronous integration |
+| MinIO | avatars and savings goal images |
+| Qdrant | vector memory for AI assistant |
+| Langfuse DB | traces and observability data |
 
-### 7. Redis-like caching
+---
 
-Redis is used for:
+## 6. Redis Usage
+
+Redis is used for several independent responsibilities:
+
+| Key pattern | Purpose |
+|---|---|
+| `user:{user_id}` | cached user profile |
+| `summary:{user_id}` | cached transaction summary |
+| `rate_limit:{client_ip}:{minute}` | API Gateway rate limiter counter |
+| `jwt:blacklist:{jti}` | invalidated JWT token after logout |
+| `lock:goal:{goal_id}` | worker lock for concurrent goal operation processing |
+
+This demonstrates Redis as both a cache and an operational coordination component.
+
+---
+
+## 7. Kafka Events
+
+Kafka is used for asynchronous communication and event logging.
+
+Important topics/events:
+
+| Topic | Producer | Consumer / Purpose |
+|---|---|---|
+| `user.registered` | Auth Service | event log / future analytics |
+| `user.logged_in` | Auth Service | event log / future security analytics |
+| `transaction.created` | Transaction Service | event log / recommendation refresh |
+| `transaction.deleted` | Transaction Service | event log / cache invalidation history |
+| `goal.created` | Savings Service | event log |
+| `goal.image.updated` | Savings Service | event log |
+| `goal.deleted` | Savings Service | event log |
+| `goal.operation.created` | Savings Service | Worker Service processes deposit/withdraw operations |
+| `recommendations.generated` | RecSys Service | event log |
+
+The most important topic is `goal.operation.created`, because it drives the asynchronous savings-goal operation flow.
+
+---
+
+## 8. gRPC Communication
+
+The project contains two meaningful gRPC flows.
+
+### 8.1 Transaction Summary gRPC Flow
 
 ```text
-user:{user_id}                      user profile cache, TTL 300 seconds
-summary:{user_id}                   transaction summary cache, TTL 60 seconds
-rate_limit:{client_ip}:{window}     API Gateway rate limiter counter
+Frontend
+  ↓ HTTP
+Nginx :8088
+  ↓ HTTP
+API Gateway
+  ↓ gRPC
+Transaction Service :50051
+  ↓
+PostgreSQL / Redis
 ```
 
-### 8. Routing layer
+Endpoint through API Gateway:
 
-The routing layer is implemented as:
-
-```text
-Frontend → Nginx Load Balancer → API Gateway replicas → Microservices
+```http
+GET /transactions/{user_id}/summary
 ```
 
-The API Gateway routes:
+The API Gateway calls `TransactionService.GetUserSummary` through gRPC and returns the financial summary to the client.
+
+### 8.2 Savings Goal Operation gRPC Flow
 
 ```text
-/auth/*              → auth-service
-/transactions/*      → transaction-service
-/summary/*           → transaction-service
-/goals/*             → savings-service
-/agent/*             → agent-service
-/recommendations/*   → recsys-service
+Frontend
+  ↓ HTTP
+Nginx :8088
+  ↓ HTTP
+API Gateway
+  ↓ gRPC
+Savings Service :50052
+  ↓
+Kafka topic: goal.operation.created
+  ↓
+Worker Service
+  ↓
+Savings DB + Transaction Service
 ```
 
-Rate limiting is implemented inside the gateway with Redis counters.
+Endpoint through API Gateway:
 
-### 9. C4 Diagrams
-
-The updated C4 diagrams are stored in:
-
-```text
-Documentation/Block3-C4/
+```http
+POST /grpc/goals/{goal_id}/operations
 ```
 
-The package contains 7 updated diagrams:
+The API Gateway calls `SavingsService.CreateGoalOperation` through gRPC. The Savings Service creates a `GoalOperation` with status `PENDING`, publishes a Kafka event, and then Worker Service processes it asynchronously.
 
-1. C4 L1 — System Context
-2. C4 L2 — Container Overview
-3. C4 L2 — Data, Events, Routing and Cache View
-4. C4 L3 — API Gateway Components
-5. C4 L3 — Transaction Service Components
-6. C4 L3 — AI Agent Service Components
-7. C4 Dynamic — Add Transaction, Cache Invalidation, Kafka Event and Recommendation Refresh
+---
 
-Available formats:
+## 9. Main Business Flow: Savings Goal Operation
+
+This is the strongest end-to-end flow in the project.
 
 ```text
-Documentation/Block3-C4/images/          PNG images for report/screenshots
-Documentation/Block3-C4/graphviz_dot/    editable Graphviz DOT sources
-Documentation/Block3-C4/mermaid/         Mermaid sources
-Documentation/Block3-C4/structurizr/     Structurizr DSL workspace
+1. User clicks Deposit or Withdraw in the frontend.
+2. Frontend sends an HTTP request to API Gateway.
+3. API Gateway calls Savings Service through gRPC.
+4. Savings Service creates GoalOperation with status PENDING.
+5. Savings Service publishes Kafka event goal.operation.created.
+6. Worker Service consumes the event.
+7. Worker Service obtains Redis lock lock:goal:{goal_id}.
+8. Worker changes operation status to PROCESSING.
+9. Worker updates savings goal amount.
+10. Worker creates linked transaction in Transaction Service.
+11. Worker marks operation as CONFIRMED.
+12. If withdrawal amount is too high, operation becomes FAILED and no transaction is created.
+```
+
+Operation statuses:
+
+```text
+PENDING → PROCESSING → CONFIRMED
+PENDING → PROCESSING → FAILED
 ```
 
 ---
 
-## 5. Run locally
+## 10. AI Assistant
+
+The AI assistant is implemented in `agent-service`.
+
+Main components:
+
+- Orchestrator Agent;
+- Router Agent;
+- Analyst Agent;
+- Advisor Agent;
+- Mem0 memory adapter;
+- Qdrant vector memory;
+- Ollama local LLM runtime;
+- Langfuse tracing;
+- Prometheus-style `/metrics` endpoint.
+
+The selected local model is:
+
+```text
+gemma3:4b
+```
+
+Embeddings model:
+
+```text
+nomic-embed-text
+```
+
+The assistant can analyze real transaction data and answer in the same language as the user.
+
+---
+
+## 11. Recommendation Service
+
+`recsys-service` generates recommendations based on real transaction data from `transaction-service`.
+
+Implemented approaches:
+
+- heuristic recommendations;
+- content-based recommendations;
+- simple collaborative-style category vector logic.
+
+Endpoint:
+
+```http
+GET /recommendations/{user_id}
+```
+
+---
+
+## 12. Integration Tests
+
+The project contains integration tests based on `pytest` and `requests`.
+
+Run tests:
+
+```bash
+pip install -r requirements-test.txt
+pytest tests -v
+```
+
+Expected result:
+
+```text
+12 passed
+```
+
+The tests verify:
+
+- API Gateway and core service health;
+- Agent Service health and metrics;
+- Frontend and Kafka UI availability;
+- registration, login, `/me`, logout;
+- JWT blacklist in Redis;
+- avatar upload to MinIO;
+- transaction creation;
+- transaction idempotency;
+- gRPC transaction summary;
+- savings goal image upload to MinIO;
+- gRPC `CreateGoalOperation` flow;
+- Kafka Worker processing;
+- confirmed and failed operation statuses;
+- automatic transaction creation after confirmed goal operation;
+- recommendation generation.
+
+Important note: ordinary CRUD calls in tests go directly to services to avoid exhausting the API Gateway rate limiter. Gateway is used where it is architecturally important: gRPC summary and gRPC goal operation flows.
+
+---
+
+## 13. How to Run Locally
 
 ### 1. Start Ollama on the host machine
 
@@ -191,80 +347,96 @@ ollama pull gemma3:4b
 ollama pull nomic-embed-text
 ```
 
-### 2. Start Docker Compose
+### 2. Start the full system
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
-### 3. Start frontend
+### 3. Check containers
 
 ```bash
-cd frontend
-python -m http.server 5500
+docker compose ps
 ```
 
-Open:
+### 4. Open the application
 
 ```text
-http://127.0.0.1:5500/login.html
+Frontend:      http://localhost:5500
+API Gateway:   http://localhost:8088/health
+Kafka UI:      http://localhost:8080
+Langfuse:      http://localhost:3000
+MinIO Console: http://localhost:9001
+Qdrant:        http://localhost:6333/dashboard
 ```
 
 ---
 
-## 6. Useful local URLs
+## 14. Useful Demo Commands
 
-| URL | Purpose |
-|---|---|
-| `http://127.0.0.1:5500/login.html` | Frontend login page |
-| `http://127.0.0.1:8088/health` | Load-balanced API Gateway health check |
-| `http://127.0.0.1:8080` | Kafka UI |
-| `http://127.0.0.1:3000` | Langfuse UI |
-| `http://127.0.0.1:8004/metrics` | Agent Service Prometheus metrics |
-| `http://127.0.0.1:6333/dashboard` | Qdrant dashboard, if enabled by image version |
-
----
-
-## 7. Example API checks
-
-### Gateway health through Nginx balancer
+### Gateway health
 
 ```bash
-curl http://127.0.0.1:8088/health
+curl http://localhost:8088/health
 ```
 
-Expected result should include one of the gateway instance names:
+### Kafka UI
 
-```json
-{
-  "service": "api-gateway",
-  "instance": "api-gateway-1",
-  "status": "running",
-  "rate_limit_per_minute": 60
-}
+```text
+http://localhost:8080
 ```
 
-Repeated requests may show `api-gateway-1` and `api-gateway-2`, depending on balancing.
-
-### Create a transaction through the gateway
+### PostgreSQL examples
 
 ```bash
-curl -X POST http://127.0.0.1:8088/transactions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "demo-user",
-    "amount": 500,
-    "category": "Groceries",
-    "type": "expense",
-    "description": "Test transaction",
-    "date": "2026-05-22"
-  }'
+docker compose exec postgres psql -U kopilkin -d auth_db -c "SELECT id, email, name FROM users LIMIT 5;"
 ```
 
-This should:
+```bash
+docker compose exec postgres psql -U kopilkin -d transaction_db -c "SELECT id, amount, category, type FROM transactions ORDER BY date DESC LIMIT 10;"
+```
 
-1. store the transaction in `transaction_db`;
-2. publish `transaction.created` to Kafka;
-3. invalidate `summary:demo-user` in Redis.
+```bash
+docker compose exec postgres psql -U kopilkin -d savings_db -c "SELECT id, title, current_amount, target_amount, status FROM savings_goals LIMIT 10;"
+```
+
+### Worker logs
+
+```bash
+docker compose logs --tail=100 worker-service
+```
+
+### Kafka topic inspection from container
+
+```bash
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+```
 
 ---
+
+## 15. Project Structure
+
+```text
+Kopilkin/
+├── agent-service/          # AI assistant service
+├── api-gateway/            # gateway, rate limiter, gRPC clients
+├── auth-service/           # users, JWT, avatars
+├── transaction-service/    # transactions, summaries, gRPC server
+├── savings-service/        # goals, operations, images, gRPC server
+├── worker-service/         # Kafka consumer for goal operations
+├── recsys-service/         # recommendations
+├── frontend/               # static web UI
+├── infra/
+│   ├── nginx/              # load balancer config
+│   └── postgres/           # init databases
+├── proto/                  # gRPC proto files
+├── tests/                  # integration tests
+├── Documentation/          # reports and C4 docs
+├── docker-compose.yml
+├── requirements-test.txt
+└── README.md
+```
+
+## 16. Short Summary
+
+**Kopilkin** is a microservice-based personal finance assistant. It uses FastAPI services, PostgreSQL databases, Redis, Kafka, gRPC, MinIO, Nginx load balancing, and a local AI assistant with Ollama, Qdrant and Langfuse. The strongest business flow is savings goal operations: the frontend sends a request to API Gateway, API Gateway calls Savings Service through gRPC, Savings Service publishes a Kafka event, Worker Service processes it asynchronously with Redis locking, updates the goal and creates a related transaction. The project is verified by integration tests with `12 passed`.

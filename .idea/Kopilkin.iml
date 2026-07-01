@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/auth-service" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/savings-service" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/transaction-service" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/api-gateway" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
     </content>
     <orderEntry type="inheritedJdk" />
